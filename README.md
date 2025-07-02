@@ -129,6 +129,97 @@ suspend fun myCoroutine() {
     }
 ```
 
+## 🚀 Coroutine Scope Reuse
+
+- You can reuse a CoroutineScope to launch multiple coroutines — as long as it’s active (not cancelled).
+- This is safe, efficient, and encouraged:
+
+```
+val scope = CoroutineScope(Job() + Dispatchers.Default)
+
+scope.launch { println("🔹 Task-1") }
+scope.launch { println("🔸 Task-2") } // ✅ Reuse is fine
+
+```
+
+### ❌ What Happens After scope.cancel()?
+
+```
+val scope = CoroutineScope(Job())
+scope.cancel()
+
+scope.launch {
+    println("❌ This will never run")
+}
+```
+
+### ⚠️ Internally
+
+- The coroutine is immediately cancelled
+- The scope becomes inactive
+- Any new coroutine won’t start and doesn’t start executing any logic 
+- A CancellationException is thrown internally
+- The app won’t crash
+
+### ✅ Correct Reuse Pattern
+
+- To reuse after cancellation, create a new scope:
+
+```
+var scope = CoroutineScope(Job() + Dispatchers.Default)
+
+scope.launch { println("Task-A") }
+
+scope.cancel() // Scope is now dead
+
+scope = CoroutineScope(Job() + Dispatchers.Default)
+scope.launch { println("Task-B") } // ✅ Works
+
+```
+
+## 🚀 CoroutineScope .launch & .async
+
+### ✅ What is CoroutineScope.launch {}?
+- launch {} is an extension function on CoroutineScope
+- It is a coroutine builder — it starts a new coroutine without expecting any result.
+- It is the entry point of a coroutine inside a scope.
+- It returns a Job, which represents the coroutine’s lifecycle (you can cancel it, observe completion, etc.)
+- launch is used when:
+	- You don’t need a result
+	- You're triggering jobs like database writes, logging, etc.
+	- You care about lifecycle control via Job
+
+```
+val job = CoroutineScope(Dispatchers.Default).launch {
+    println("Running something...")
+}
+```
+
+### ✅ What is CoroutineScope.async {}?
+- async {} is an extension function on CoroutineScope
+- It is a coroutine builder — used to start a new coroutine that returns a result
+- It is also an entry point into a coroutine
+- It returns a Deferred<T>, a lightweight future-like object. You get the result by calling await() on it (which is a suspend function)
+- If you use async {} and don’t call await(), the coroutine still runs, and:
+	- Any exception will be lost. Exceptions will be silently missed.
+	- Your result will be unused
+	- May cause bugs or memory leaks
+- So always remember to await() call
+
+```
+val deferred: Deferred<Int> = CoroutineScope(Dispatchers.Default).async {
+	println("🧮 Calculating...")
+    77
+}
+
+val result = deferred.await()
+println("✅ Result: $result")
+```
+
+### 🧱 Coroutine Builders – launch {} and async {}
+✅ CoroutineScope.launch {} and CoroutineScope.async {} are coroutine builders
+used to spawn child coroutines that inherit the job and context from the surrounding scope or coroutine.
+
 ---
 
 ## 📘 Kotlin Coroutines – Ordinary Job Behavior with Exception Flow
@@ -201,13 +292,21 @@ suspend fun myCoroutine() {
     joinAll(job1, job2)
     scope.cancel()
 }
+
 ```
 
-### 🧪 Coroutine Failure Propagation in Kotlin
+### 🧵 Output Snapshot (Expected)
 
-This project demonstrates how **coroutine failure propagation** works in Kotlin when using a standard `Job()` in a `CoroutineScope`.
-
----
+```
+Task-1 stared.
+Task-2 stared.
+Task-3 stared.
+Task-4 stared.
+Task-3 finished.
+Job-2 Completed. Exception: kotlinx.coroutines.JobCancellationException: Parent job is Cancelling; job=JobImpl{Cancelling}@1a6dee65
+CoroutineExceptionHandler: java.lang.RuntimeException
+Job-1 Completed. Exception: java.lang.RuntimeException
+```
 
 ### 📌 What Happens Internally?
 
@@ -219,20 +318,6 @@ All tasks are launched in the same `CoroutineScope`, which uses an **ordinary `J
   - Propagates upward and cancels the entire `CoroutineScope`.
   - Consequently, `job2` is also cancelled—even though its child tasks (`Task-3`, `Task-4`) are unrelated and running fine.
 
----
-
-### 🧵 Output Snapshot (Expected)
-
-```plaintext
-Task-1 stared.
-Task-2 stared.
-Task-3 stared.
-Task-4 stared.
-Task-3 finished.
-Job-2 Completed. Exception: kotlinx.coroutines.JobCancellationException: Parent job is Cancelling; job=JobImpl{Cancelling}@1a6dee65
-CoroutineExceptionHandler: java.lang.RuntimeException
-Job-1 Completed. Exception: java.lang.RuntimeException
-```
 
 ### ❗ Important Rule of Ordinary Job
 
@@ -263,8 +348,6 @@ CoroutineScope (Job)
 A **SupervisorJob** is a special kind of `Job` in Kotlin Coroutines where the failure of a child **does not cancel its siblings** or the parent scope.
 
 > 💡 It provides **exception isolation**, which means that one coroutine's failure **does not bring down the whole scope**.
-
----
 
 ### 🔗 Core Principle: SupervisorJob is Tolerant
 
@@ -338,19 +421,7 @@ All tasks are launched in the same `CoroutineScope`, which uses a **SupervisorJo
   - `job2` and its children (`Task-3`, `Task-4`) continue to run normally.
 
 
-### 🧵 Output Snapshot (Expected)
 
-```
-Task-1 started.
-Task-2 started.
-Task-3 started.
-Task-4 started.
-Task-3 finished.
-Task-4 finished.
-Job-2 Completed.
-CoroutineExceptionHandler: java.lang.RuntimeException: Task-2 failed!
-Job-1 Completed. Exception: java.lang.RuntimeException: Task-2 failed!
-```
 
 ### ❗ Important Rule of SupervisorJob
 
@@ -370,7 +441,7 @@ CoroutineScope (SupervisorJob)
     └── Task-4 ✅
 ```
 
-## 📘 Kotlin Coroutines – `Dispatchers.Main` in Android
+## 📘 `Dispatchers.Main` in Android
 
 ### 🚀 What is `Dispatchers.Main`?
 
@@ -509,3 +580,156 @@ delay(100) → suspends → back to Task-1
  - No two coroutines run at the same moment, but they take turns efficiently by suspending and resuming.
    
 ---
+
+## 📘 Dispatchers.Default in Kotlin Coroutines
+
+### 🚀 What is Dispatchers.Default?
+
+- Dispatchers.Default is a coroutine dispatcher optimized for CPU-intensive tasks.
+- It runs coroutines on a shared pool of background threads, allowing true parallelism, and the number of threads is based on available CPU cores: (at least 2), and typically equal to the number of cores (2, 4, 8, etc.)
+- Coroutines launched with Dispatchers.Default can run simultaneously in parallel on multiple threads.
+- Suspension points (yield, delay, withContext, etc.) are not required for parallelism.
+- It also runs coroutines concurrently, especially when many coroutines share the same thread — similar to Dispatchers.Default is when the number of coroutines exceeds the available CPU threads.
+
+- It is used for:
+	- Sorting large lists
+	- Performing heavy calculations
+	- Parsing big JSON/XML files
+	- Executing pure computational logic without blocking the main thread
+
+
+### 🧪 Example: Parallel (Asynchronous) behaviour
+
+ ```
+class MyViewModel : ViewModel() {
+
+    init {
+        viewModelScope.launch(Dispatchers.Default) {
+            repeat(1000) {
+                println("Task-1: Count-$it")
+            }
+        }
+
+        viewModelScope.launch(Dispatchers.Default) {
+            repeat(1000) {
+                println("Task-2: Count-$it")
+            }
+        }
+    }
+}
+ ```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Task-1: Count-0
+Task-2: Count-0
+Task-1: Count-1
+Task-2: Count-1
+Task-1: Count-2
+Task-2: Count-2
+...
+```
+
+---
+
+## 📘 Dispatchers.IO in Kotlin Coroutines
+
+### 🚀 What is Dispatchers.IO?
+
+	- Dispatchers.IO is a coroutine dispatcher optimized for I/O-bound operations.
+	- It uses a shared thread pool with a larger number of threads than Dispatchers.Default.
+ 	- Dispatchers.IO can run a large number of coroutines concurrently, even if some block.
+	- It starts with a few threads but can expand up to 64 threads to handle blocking tasks efficiently.
+	- If multiple coroutines share the same thread (e.g., >64 coroutines), they still run concurrently using suspension (delay, withContext, yield, etc.).
+
+	- It is used for:
+		- Reading/writing files
+		- Database access
+		- Network calls (Retrofit, HTTP, etc.)
+		- Any long-running blocking I/O task
+
+
+### 🧠 Behavior
+
+	✅ Designed for blocking I/O tasks — it's okay if a coroutine blocks a thread for a while.
+    ✅ Can grow its thread pool dynamically, up to 64 threads (default upper limit).
+    ✅ Coroutines run concurrently, even when sharing threads — by suspending at I/O points.
+
+
+### 🧪 Example: Parallel (Asynchronous) behaviour
+
+ ```
+class MyViewModel : ViewModel() {
+
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            repeat(1000) {
+                println("Task-1: Count-$it")
+            }
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            repeat(1000) {
+                println("Task-2: Count-$it")
+            }
+        }
+    }
+}
+ ```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Task-1: Count-0
+Task-2: Count-0
+Task-1: Count-1
+Task-2: Count-1
+Task-1: Count-2
+Task-2: Count-2
+...
+```
+
+---
+
+## 🔁 Coroutine Thread Switching
+
+	- A coroutine can start on one thread and finish on another.
+	- Coroutines are not tightly bound to a single thread — they’re bound to a dispatcher, which may assign different threads across suspension/resume points.
+ 	- It applies to:
+  		- Dispatchers.Default
+		- Dispatchers.IO
+		- Dispatchers.Unconfined (if it suspends)
+		- Any custom coroutine dispatcher
+	- Exceptions:
+		- On Dispatchers.Main (Android UI), it will always resume on the same Main thread.
+		- If you use a newSingleThreadContext, coroutine will resume on the same thread to guarantee sequential behavior.
+
+
+### 🧪 Example: Thread Switch After Suspension
+
+```
+fun main() = runBlocking {
+    launch(Dispatchers.Default) {
+        println("Started on: ${Thread.currentThread().name}")
+        delay(500)
+        println("Resumed on: ${Thread.currentThread().name}")
+    }
+}
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Started on: DefaultDispatcher-worker-1
+Resumed on: DefaultDispatcher-worker-3
+```
+
+---
+
+
+
+---
+
+
+
