@@ -727,9 +727,449 @@ Resumed on: DefaultDispatcher-worker-3
 
 ---
 
+## ❌ Coroutine Cancellation
 
+### Job Cancellation at Suspension Points:
+
+🚦 Cancellation in Kotlin Coroutines
+	- Cancellation in coroutines is cooperative —
+	- The coroutine must reach a suspension point to respond to cancellation.
+ 	- A suspension point is a place where the coroutine pauses and checks for cancellation. 
+  	Most common:
+		- delay()
+		- yield()
+		- withContext()
+
+```
+  suspend fun main() {
+    val scope = CoroutineScope(Job() + Dispatchers.Default)
+
+    val job = scope.launch {
+        println("Task started on ${Thread.currentThread().name}")
+        delay(5000) // ← Suspension point (cancellation possible here)
+        println("Task completed")
+    }
+
+    delay(1000)
+    job.cancel()
+}
+```
+
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Task started on DefaultDispatcher-worker-1
+```
+
+✅ Then, cancellation happens — the coroutine never finishes.
 
 ---
 
+### ⚠️ What Happens Inside Suspension Point on Cancellation
+- When a coroutine is cancelled during a suspension point like delay(), yield(), or withContext, that suspending function throws a CancellationException.
+
+```
+suspend fun main() {
+    val job = CoroutineScope(Dispatchers.Default).launch {
+        try {
+            println("🔁 Delaying...")
+            delay(5000)
+            println("✅ Completed") // ❌ This won't execute
+        } catch (exception: CancellationException) {
+            println("❗Caught CancellationException: $exception")
+            performCleanup()
+            throw exception // 🔁 Always rethrow to respect coroutine cancellation
+        }
+    }
+    delay(1000)
+    job.cancel()
+}
+```
+
+```
+suspend fun main() {
+    val job = CoroutineScope(Dispatchers.Default).launch {
+        try {
+            println("🚀 Started long task")
+            delay(5000)
+            println("✅ Work done") // Won’t reach here if cancelled
+        } catch (e: CancellationException) {
+            println("❗Caught CancellationException")
+            throw e // ✅ Always rethrow!
+        } finally {
+            println("🧼 Cleaning up after cancellation or completion")
+        }
+    }
+    delay(1000)
+    job.cancel()
+}
+```
+
+### ⚠️ Why Rethrow?
+- If you suppress CancellationException and don’t rethrow it, the parent coroutine may never know its child was cancelled. 
+- That breaks the coroutine hierarchy and can cause silent bugs or leaked coroutines.
+
+✅ Pattern to Follow
+
+```
+try {
+    // Suspends
+} catch (exception: CancellationException) {
+    // Perform cleanup
+    throw exception // ✅ Must rethrow
+}
+```
+
+```
+launch {
+    try {
+        // Suspends
+    } catch (exception: CancellationException) {
+        // Optional catch
+        throw exception
+    } finally {
+        // Always runs
+    }
+}
+```
+
+### ⚠️ Non-Reachable Code After Suspension in catch
+
+```
+suspend fun main() {
+    val job = CoroutineScope(Dispatchers.Default).launch {
+        try {
+            println("🚀 Started long task")
+            delay(5000)
+            println("✅ Work done") // ❌ Won’t run if cancelled
+        } catch (e: CancellationException) {
+            delay(100) // ← Already cancelled, so this throws again!
+
+            // ❌ Non-reachable code — never runs
+            performCleanUp()
+
+            println("❗Caught CancellationException")
+            throw e // ✅ Unnecessary here, exception already re-thrown
+        }
+    }
+
+    delay(1000)
+    job.cancel()
+}
+```
+
+#### 🔥 What Happens Internally?
+
+- Coroutine starts and hits delay(5000)
+- After 1 sec, you call job.cancel() → This cancels the coroutine and throws CancellationException
+- The catch block catches it. 
+- Then inside the catch, you call: delay(100)
+- But the coroutine is already cancelled. So:
+- delay(100) throws another CancellationException
+- Everything after ```delay(100)``` is skipped
+- Code like performCleanUp() and ```throw exception``` never run
+- It’s like throwing another exception while handling an exception, so the remaining code is lost.
+
+#### ✅ How to Fix It?
+
+- Use a non-suspending cleanup approach in catch, or move suspending cleanup into a finally block (which runs safely even during cancellation):
+
+```
+suspend fun main() {
+    val job = CoroutineScope(Dispatchers.Default).launch {
+        try {
+            println("🚀 Started long task")
+            delay(5000)
+            println("✅ Work done")
+        } catch (exception: CancellationException) {
+            // 🔥 Don't call suspending functions here if already cancelled
+            performImmediateCleanup() // ✅ Non-suspending
+            throw exception
+        } finally {
+            // ✅ Safe place for suspending cleanup
+            delay(100)
+            println("🧼 Final cleanup after cancellation")
+        }
+    }
+
+    delay(1000)
+    job.cancel()
+}
+```
+
+#### 🧠 Rule of Thumb
+✅ Use catch for quick non-suspending recovery
+✅ Use finally for cleanup, including suspending calls
+❌ Don’t call suspending functions in catch after cancellation unless you're handling nested suspensions very carefully.
 
 
+### Job Cancellation in Synchronous / Non-Suspending Code
+
+- Kotlin coroutine cancellation is cooperative.
+- If your coroutine never suspends, it will not respond to cancellation.
+- So if you write code like this:
+  ```
+    val job = CoroutineScope(Dispatchers.Default).launch {
+        println("Starting heavy loop")
+        for(i in 0..1_00_000) {
+            println("Count: $i")
+            // ❌ No delay, yield, or withContext → won't cancel!
+        }
+        println("Finished")
+    }
+    delay(100)
+    job.cancel() // ← Won’t stop the loop!
+  ```
+  Even after calling job.cancel(), the loop keeps running because there's no suspension point, and cancellation is not checked manually.
+
+
+### 🔥 Why It Happens?
+
+- Coroutine cancellation relies on checking cancellation status
+- This check only happens at:
+	1. Suspension points (delay, yield, withContext, etc.)
+  				OR
+	2. If you explicitly check using isActive, ensureActive()
+
+### ✅ Solution: Cooperative Cancellation
+- To make non-suspending code cancellable, you must manually check:
+
+✅ 1. Using isActive
+
+```
+val job = CoroutineScope(Dispatchers.Default).launch {
+        println("Starting heavy loop")
+
+        for(i in 0..1_00_000) {
+            if (!isActive) break // ✅ Check if coroutine is still active
+
+            // Do work
+            println("Count: $i")
+        }
+
+        println("After Loop")
+    }
+
+    delay(100)
+    job.cancel()
+}
+```
+
+### 🧵 Output Snapshot (Expected):
+
+```
+Starting heavy loop
+Count-0
+...
+Count-8127
+After Loop
+```
+
+- isActive is safe when you want to exit gracefully.
+
+### Non-reachable code
+
+```
+val job = CoroutineScope(Dispatchers.Default).launch {
+    println("Starting heavy loop")
+
+    for (i in 0..1_00_000) {
+        if (isActive) {
+            println("Count: $i") // ✅ Still active, continue work
+        } else {
+            delay(100) // ❌ Throws CancellationException immediately
+            println("Perform clean-up") // ❌ Never reached
+            throw CancellationException()
+        }
+    }
+
+    println("After Loop") // ❌ Not reached
+}
+
+delay(100)
+job.cancel()
+```
+
+### 🧵 Output Snapshot (Expected):
+```
+Starting heavy loop
+Count-0
+...
+Count-8127
+```
+
+### ⚠️ What’s the Problem?
+- When job.cancel() is called, isActive becomes false, so execution enters the else block.
+- delay(100) is a suspension point.
+- The coroutine is already cancelled, delay() checks that and throws CancellationException immediately.
+- So "Perform clean-up" is never executed, and the coroutine exits before proper cleanup. And so "After Loop" also is not executed.
+
+
+## 🛡️ withContext(NonCancellable)
+- withContext(NonCancellable) is used to temporarily disable cancellation inside a coroutine block.
+- Even if the coroutine is cancelled, any suspending operations within this block will still execute safely.
+
+```
+withContext(NonCancellable) { // ✅ Handles cancellation — exception won't propagate to the Job
+    delay(1000)               // ✅ Any suspension point here won't cancel the coroutine
+    println("✅ Always runs after cancellation too")
+}
+```
+
+### ✅ Fixed with withContext(NonCancellable):
+```
+val job = CoroutineScope(Dispatchers.Default).launch {
+    println("Starting heavy loop")
+
+    for (i in 0..1_00_000) {
+        if (isActive) {
+            println("Count: $i")
+        } else {
+            withContext(NonCancellable) {
+                delay(100) // ✅ Runs safely
+                println("Perform clean-up") // ✅ Executed
+            }
+
+            throw CancellationException() // ✅ Rethrow to exit cleanly
+        }
+    }
+
+    println("After Loop") // ❌ Not reached
+}
+
+delay(100)
+job.cancel()
+
+```
+
+- When job.cancel() is called, isActive becomes false, so execution enters the else block.
+- delay(100) is a suspension point.
+- The coroutine is already cancelled, delay() checks that and throws CancellationException immediately.
+- This time, the code inside the else block is wrapped in withContext(NonCancellable). This special context suppresses cancellation inside the block.
+- Now, delay(100) executes safely even though the coroutine was already cancelled. And below line of code executes reliably.
+- It is the recommended pattern for cleanup involving suspension in a cancelled coroutine.
+
+  
+✅ 2. Using ensureActive()
+
+```
+val job = CoroutineScope(Dispatchers.Default).launch {
+        println("Starting heavy loop")
+
+        for(i in 0..1_00_000) {
+            ensureActive() // ✅ Will throw CancellationException if cancelled
+
+            // Do work
+            println("Count: $i")
+        }
+
+        println("After Loop")
+    }
+
+    delay(100)
+    job.cancel()
+}
+```
+
+### 🧵 Output Snapshot (Expected):
+
+```
+Starting heavy loop
+Count-0
+...
+Count-8127
+```
+
+- ensureActive() is more aggressive: it throws CancellationException immediately.
+
+### 🧠 Behavior
+- When ensureActive() is used inside a coroutine, it immediately checks whether the coroutine has been cancelled. If it has, ensureActive() throws a CancellationException at that exact line. As a result, any code written after the ensureActive() call becomes unreachable and does not execute.
+- So "After Loop" is not printed here.
+
+
+### ✅ with try-catch + ensureActive()
+
+```
+val job = CoroutineScope(Dispatchers.Default).launch {
+    println("Starting heavy loop")
+
+    for (i in 0..1_00_000) {
+        try {
+            ensureActive() // Throws CancellationException if cancelled
+        } catch (exception: CancellationException) {
+            println("Perform clean-up") // ✅ Runs once, inside loop
+            throw exception // ✅ Re-throws to exit the coroutine
+        }
+
+        println("Count: $i") // Runs only until cancelled
+    }
+
+    println("After Loop") // ❌ Skipped, coroutine exits early
+}
+
+delay(100)
+job.cancel()
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Starting heavy loop  
+Count: 0  
+Count: 1  
+...  
+Count: 8127  
+Perform clean-up
+```
+
+### 🔍 What’s Happening Internally?
+- When job.cancel() is called, it immediately sends a cancellation signal to the coroutine.
+- As the loop continues, it eventually hits ensureActive(), which checks for cancellation and throws a CancellationException.
+- The try-catch block catches this exception and runs the catch block.
+- Inside the catch, the exception is rethrown, and due to rethrowing the CancellationException from the catch block, the coroutine gets immediately cancelled.
+
+### ✅ Best Practice Reminder
+- Always rethrow CancellationException after cleanup to maintain structured concurrency and prevent orphaned coroutines.
+
+
+### ⚠️ Suspension after Cancellation (inside catch block)
+
+```
+val job = CoroutineScope(Dispatchers.Default).launch {
+    println("Starting heavy loop")
+
+    for (i in 0..1_00_000) {
+        try {
+            ensureActive() // Throws CancellationException if cancelled
+        } catch (exception: CancellationException) {
+            println("Perform clean-up") // ✅ Runs once after cancellation
+
+            delay(10) // ❗Suspending call after catching CancellationException
+
+            throw exception // ✅ Re-throw to respect cancellation
+        }
+
+        println("Count: $i") // ❌ Not executed after cancellation
+    }
+
+    println("After Loop") // ❌ Not reached
+}
+
+delay(100)
+job.cancel()
+```
+
+### 🔍 What’s Happening Internally?
+- When job.cancel() is called, it immediately sends a cancellation signal to the coroutine.
+- As the loop continues, it eventually hits ensureActive(), which checks the coroutine's cancellation status and throws a CancellationException.
+- The try-catch block catches this exception and executes the catch block.
+- Inside the catch, the suspension point delay(10) runs without throwing another CancellationException.
+- That’s because the first suspension point that detects cancellation (in this case, ensureActive()) throws the exception.
+- If that exception is caught and not rethrown immediately, later suspension points do not rethrow unless cancellation is re-triggered.
+- Finally, the exception is manually rethrown inside the catch.
+- Due to this rethrow of CancellationException, the coroutine exits immediately, and no further code (like "Count: $i" or "After Loop") executes.
+
+### 🔥 Key Insight:
+- Once a coroutine detects cancellation and throws a CancellationException,
+- If that exception is handled, the coroutine resumes "normally", and later suspension points won’t throw again unless you retrigger cancellation or manually rethrow the original exception.
