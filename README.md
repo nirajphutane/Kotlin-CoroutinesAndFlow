@@ -1173,3 +1173,14 @@ job.cancel()
 ### 🔥 Key Insight:
 - Once a coroutine detects cancellation and throws a CancellationException,
 - If that exception is handled, the coroutine resumes "normally", and later suspension points won’t throw again unless you retrigger cancellation or manually rethrow the original exception.
+
+
+### 🔥 Goldan rule:
+
+- When job.cancel() is called, it signals the coroutine to cancel by propagating a CancellationException.
+- However, this exception is not thrown immediately — instead, it is thrown only when the coroutine reaches a suspension point such as delay(), withContext, yield(), or explicitly via ensureActive().
+- Alternatively, cancellation can be detected non-suspensively using isActive, though it won’t throw — it only returns false.
+- Importantly, CancellationException is not caught by declarative tools like CoroutineExceptionHandler because it's considered a controlled cancellation, not an unhandled failure.
+- To handle it, you must use imperative try-catch blocks.
+- But catching the exception does not automatically stop the coroutine — if you catch and suppress it, the coroutine continues executing.
+- Therefore, to ensure proper cancellation after cleanup or custom logic, it is crucial to rethrow the CancellationException manually.
