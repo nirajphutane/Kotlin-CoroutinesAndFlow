@@ -735,7 +735,7 @@ Resumed on: DefaultDispatcher-worker-3
 	- Cancellation in coroutines is cooperative —
 	- The coroutine must reach a suspension point to respond to cancellation.
  	- A suspension point is a place where the coroutine pauses and checks for cancellation. 
-  	Most common:
+  	- Most common:
 		- delay()
 		- yield()
 		- withContext()
@@ -767,7 +767,7 @@ Task started on DefaultDispatcher-worker-1
 ---
 
 ### ⚠️ What Happens Inside Suspension Point on Cancellation
-- When a coroutine is cancelled during a suspension point like delay(), yield(), or withContext, that suspending function throws a CancellationException.
+- When a coroutine is cancelled during a suspension point like delay(), yield(), or withContext, that suspending function implicitly throws a CancellationException.
 
 ```
 suspend fun main() {
@@ -807,7 +807,7 @@ suspend fun main() {
 ```
 
 ### ⚠️ Why Rethrow?
-- If you suppress CancellationException and don’t rethrow it, the parent coroutine may never know its child was cancelled. 
+- If you suppress CancellationException and don’t explicitly rethrow it, the parent coroutine may never know its child was cancelled. 
 - That breaks the coroutine hierarchy and can cause silent bugs or leaked coroutines.
 
 ✅ Pattern to Follow
@@ -862,11 +862,11 @@ suspend fun main() {
 #### 🔥 What Happens Internally?
 
 - Coroutine starts and hits delay(5000)
-- After 1 sec, you call job.cancel() → This cancels the coroutine and throws CancellationException
-- The catch block catches it. 
-- Then inside the catch, you call: delay(100)
-- But the coroutine is already cancelled. So:
-- delay(100) throws another CancellationException
+- After 1 sec, you call job.cancel() → This cancels the coroutine and implicitly throws CancellationException
+- The catch block catches it explicitly. 
+- Then inside the catch, delay(100) is called.
+- But the coroutine is already cancelled.
+- So: delay(100) implicitly throws another CancellationException
 - Everything after ```delay(100)``` is skipped
 - Code like performCleanUp() and ```throw exception``` never run
 - It’s like throwing another exception while handling an exception, so the remaining code is lost.
@@ -926,11 +926,11 @@ suspend fun main() {
 
 ### 🔥 Why It Happens?
 
-- Coroutine cancellation relies on checking cancellation status
+- Coroutine cancellation relies on checking the cancellation status
 - This check only happens at:
-	1. Suspension points (delay, yield, withContext, etc.)
+	1. Implicitly: By Suspension points (delay, yield, withContext, etc.)
   				OR
-	2. If you explicitly check using isActive, ensureActive()
+	2. Explicitly: By using isActive, ensureActive()
 
 ### ✅ Solution: Cooperative Cancellation
 - To make non-suspending code cancellable, you must manually check:
@@ -1002,11 +1002,12 @@ Count-8127
 ### ⚠️ What’s the Problem?
 - When job.cancel() is called, isActive becomes false, so execution enters the else block.
 - delay(100) is a suspension point.
-- The coroutine is already cancelled, delay() checks that and throws CancellationException immediately.
+- The coroutine is already cancelled, delay() checks that and implicitly throws CancellationException immediately.
 - So "Perform clean-up" is never executed, and the coroutine exits before proper cleanup. And so "After Loop" also is not executed.
 
 
 ## 🛡️ withContext(NonCancellable)
+
 - withContext(NonCancellable) is used to temporarily disable cancellation inside a coroutine block.
 - Even if the coroutine is cancelled, any suspending operations within this block will still execute safely.
 
@@ -1045,7 +1046,7 @@ job.cancel()
 
 - When job.cancel() is called, isActive becomes false, so execution enters the else block.
 - delay(100) is a suspension point.
-- The coroutine is already cancelled, delay() checks that and throws CancellationException immediately.
+- The coroutine is already cancelled, delay() checks that and implicitly throws CancellationException immediately.
 - This time, the code inside the else block is wrapped in withContext(NonCancellable). This special context suppresses cancellation inside the block.
 - Now, delay(100) executes safely even though the coroutine was already cancelled. And below line of code executes reliably.
 - It is the recommended pattern for cleanup involving suspension in a cancelled coroutine.
@@ -1084,7 +1085,7 @@ Count-8127
 - ensureActive() is more aggressive: it throws CancellationException immediately.
 
 ### 🧠 Behavior
-- When ensureActive() is used inside a coroutine, it immediately checks whether the coroutine has been cancelled. If it has, ensureActive() throws a CancellationException at that exact line. As a result, any code written after the ensureActive() call becomes unreachable and does not execute.
+- When ensureActive() is used inside a coroutine, it immediately checks whether the coroutine has been cancelled. If it has, ensureActive() implicitly throws a CancellationException at that exact line. As a result, any code written after the ensureActive() call becomes unreachable and does not execute.
 - So "After Loop" is not printed here.
 
 
@@ -1125,12 +1126,12 @@ Perform clean-up
 
 ### 🔍 What’s Happening Internally?
 - When job.cancel() is called, it immediately sends a cancellation signal to the coroutine.
-- As the loop continues, it eventually hits ensureActive(), which checks for cancellation and throws a CancellationException.
+- As the loop continues, it eventually hits ensureActive(), which checks for cancellation and implicitly throws a CancellationException.
 - The try-catch block catches this exception and runs the catch block.
-- Inside the catch, the exception is rethrown, and due to rethrowing the CancellationException from the catch block, the coroutine gets immediately cancelled.
+- Inside the catch, the exception is explicitly rethrown, and due to rethrowing the CancellationException from the catch block, the coroutine gets immediately cancelled.
 
 ### ✅ Best Practice Reminder
-- Always rethrow CancellationException after cleanup to maintain structured concurrency and prevent orphaned coroutines.
+- Always explicitly rethrow CancellationException after cleanup to maintain structured concurrency and prevent orphaned coroutines.
 
 
 ### ⚠️ Suspension after Cancellation (inside catch block)
@@ -1162,13 +1163,13 @@ job.cancel()
 
 ### 🔍 What’s Happening Internally?
 - When job.cancel() is called, it immediately sends a cancellation signal to the coroutine.
-- As the loop continues, it eventually hits ensureActive(), which checks the coroutine's cancellation status and throws a CancellationException.
-- The try-catch block catches this exception and executes the catch block.
+- As the loop continues, it eventually hits ensureActive(), which checks the coroutine's cancellation status and implicitly throws a CancellationException.
+- The try-catch block catches this exception explicitly and executes the catch block.
 - Inside the catch, the suspension point delay(10) runs without throwing another CancellationException.
 - That’s because the first suspension point that detects cancellation (in this case, ensureActive()) throws the exception.
 - If that exception is caught and not rethrown immediately, later suspension points do not rethrow unless cancellation is re-triggered.
-- Finally, the exception is manually rethrown inside the catch.
-- Due to this rethrow of CancellationException, the coroutine exits immediately, and no further code (like "Count: $i" or "After Loop") executes.
+- Finally, the exception is explicitly rethrown inside the catch.
+- Due to this explicit rethrow of CancellationException, the coroutine exits immediately, and no further code (like "Count: $i" or "After Loop") executes.
 
 ### 🔥 Key Insight:
 - Once a coroutine detects cancellation and throws a CancellationException,
@@ -1184,3 +1185,573 @@ job.cancel()
 - To handle it, you must use imperative try-catch blocks.
 - But catching the exception does not automatically stop the coroutine — if you catch and suppress it, the coroutine continues executing.
 - Therefore, to ensure proper cancellation after cleanup or custom logic, it is crucial to rethrow the CancellationException manually.
+
+---
+
+## 📘 Exception Handling in CoroutineScope
+
+- Both launch {} and CoroutineScope.launch {} start new coroutines. However, where an exception is caught depends entirely on the presence and placement of a CoroutineExceptionHandler in the coroutine context.
+
+### 🔹 Exception Propagation in launch {}
+
+- The exception thrown in a coroutine that is not caught imperatively in a try-catch does propagate the exception upward to the scope. If the coroutine's parent scope or the coroutine itself has a CoroutineExceptionHandler, it will catch the exception declaratively only in CoroutineExceptionHandler.
+- Uncatched exceptions always propagate upward till the parent scope, if the coroutine itself does not have a CoroutineExceptionHandler. And this Uncatched exceptions is oly caught by declaratively only in CoroutineExceptionHandler.
+
+## Declarative Exception Handling with CoroutineExceptionHandler
+
+### 🔹 1. Coroutine-level Exception Handler
+
+- If a CoroutineExceptionHandler is passed directly to the coroutine via launch(handler), then exceptions are caught locally in that coroutine:
+
+```
+val scope = CoroutineScope(Job())
+
+    val job = scope.launch(CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") }) {
+        println("Task-1 stared.")
+        delay(1000)
+        throw RuntimeException()
+        println("Task-1 finished.")
+    }
+
+    job.join()
+    scope.cancel()
+```
+
+### 🧵 Output Snapshot (Expected)
+```
+Task-1 started.
+CoroutineExceptionHandler: java.lang.RuntimeException
+```
+
+### ✅ Explanation:
+- The exception is caught by the handler attached directly to the coroutine.
+
+### 🔹 2. Scope-level Exception Handler
+
+- If no handler is passed to the coroutine, but the CoroutineScope itself was created with a CoroutineExceptionHandler, then exceptions are caught at the scope level:
+
+```
+val scope = CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") })
+
+val job = scope.launch {
+    println("Task-1 stared.")
+    delay(1000)
+    throw RuntimeException()
+    println("Task-1 finished.")
+}
+
+job.join()
+scope.cancel()
+```
+
+### 🧵 Output Snapshot (Expected)
+```
+Task-1 started.
+CoroutineExceptionHandler: java.lang.RuntimeException
+```
+
+### ✅ Explanation:
+- The exception bubbles up to the parent scope and is caught by the scope's handler.
+
+### 🔹 3. No Exception Handler — App Crashes
+
+- If neither the coroutine nor the parent scope has a CoroutineExceptionHandler, then the exception goes uncaught and will crash the app or terminate the thread:
+
+```
+val scope = CoroutineScope(Job())
+
+val job = scope.launch {
+    println("Task-1 started.")
+    delay(1000)
+    throw RuntimeException()
+    println("Task-1 finished.")
+}
+
+job.join()
+scope.cancel()
+```
+
+### 🧵 Output Snapshot (Expected)
+```
+Task-1 started.
+Exception in thread "DefaultDispatcher-worker-1" java.lang.RuntimeException
+```
+
+### ❌ Explanation:
+- No handler exists to catch the exception, so the app/thread crashes.
+
+## ✅ Imperative Exception Handling Inside Coroutine Blocks
+- In Kotlin Coroutines, exceptions thrown inside a coroutine or child coroutine can be caught imperatively using a try-catch block placed within the coroutine body.
+- If an exception is caught imperatively, it will not propagate upward to the parent scope, and CoroutineExceptionHandler will not be triggered — unless the exception is re-thrown inside the catch block.
+
+### ▶️ Example 1: Handling Exception in a Single Coroutine
+
+```
+val scope = CoroutineScope(Job())
+
+val job = scope.launch {
+    try {
+        println("Task-1 started.")
+        delay(1000)
+        throw RuntimeException()
+        println("Task-1 finished.")
+    } catch (e: Exception) {
+        println("Caught Exception: $e")
+    }
+}
+
+job.join()
+scope.cancel()
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Task-1 started.
+Caught Exception: java.lang.RuntimeException
+```
+
+### ✅ Explanation:
+- The exception is thrown inside the coroutine block and is caught by the internal try-catch.
+- Hence, it does not propagate upward, and no crash or CoroutineExceptionHandler is invoked.
+
+### ▶️ Example 2: Handling Exception in a Nested Child Coroutine
+
+```
+val scope = CoroutineScope(Job())
+
+val job = scope.launch {
+    launch {
+        try {
+            println("Task-1 started.")
+            delay(1000)
+            throw RuntimeException()
+            println("Task-1 finished.")
+        } catch (e: Exception) {
+            println("Caught Exception: $e")
+        }
+    }
+}
+
+job.join()
+scope.cancel()
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Task-1 started.
+Caught Exception: java.lang.RuntimeException
+```
+
+### ✅ Explanation:
+- The inner coroutine throws an exception, but it's wrapped with an internal try-catch.
+- So, even though it’s a child coroutine, the exception is contained locally and does not propagate to the outer job or scope.
+- CoroutineExceptionHandler is not triggered because the exception was already handled.
+
+### 🧠 Core Insight
+- If a coroutine or any of its children handle exceptions imperatively using try-catch, those exceptions won’t propagate upward and will not be caught declaratively by a CoroutineExceptionHandler — unless the catch block rethrows the exception.
+
+## ❗ try-catch Around launch {} Won’t Catch Exceptions
+
+- ❌ Wrapping launch {} or CoroutineScope.launch {} inside a try-catch block does not catch coroutine exceptions.
+- ✅ Exceptions from coroutines are caught declaratively using CoroutineExceptionHandler, either:
+	- At the coroutine level (launch(handler) {}), or
+	- At the scope level (CoroutineScope(handler)).
+- If required to handle an exception imperatively, it needs to place the try-catch inside the coroutine block.
+  
+### 🧪 Example 1: Scope has a CoroutineExceptionHandler
+
+```
+val scope = CoroutineScope(
+    Job() + CoroutineExceptionHandler { _, throwable ->
+        println("CoroutineExceptionHandler: $throwable")
+    }
+)
+
+try {
+    val job = scope.launch {
+        println("Task-1 started.")
+        delay(1000)
+        throw RuntimeException()
+        println("Task-1 finished.")
+    }
+
+    job.join()
+    scope.cancel()
+} catch (e: Exception) {
+    println("Caught Exception: $e") // ❌ Won’t execute
+}
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Task-1 started.
+CoroutineExceptionHandler: java.lang.RuntimeException
+```
+
+### 🧪 Example 2: Handler at the Coroutine Level
+
+```
+val scope = CoroutineScope(Job())
+
+val job = scope.launch(
+    CoroutineExceptionHandler { _, throwable ->
+        println("CoroutineExceptionHandler: $throwable")
+    }
+) {
+    try {
+        launch {
+            println("Task-1 started.")
+            delay(1000)
+            throw RuntimeException()
+            println("Task-1 finished.")
+        }
+    } catch (e: Exception) {
+        println("Caught Exception: $e") // ❌ Won’t execute
+    }
+}
+
+job.join()
+scope.cancel()
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Task-1 started.
+CoroutineExceptionHandler: java.lang.RuntimeException
+```
+
+## 🧩 Coroutine Job Lifecycle — Completion
+
+- A coroutine always completes implicitly — either normally, with an exception, or via cancellation.
+- No need to cancel explicitly.
+- Once completed (in any form), the Job is no longer active.
+- Use invokeOnCompletion { throwable -> ... } to monitor any of the outcomes in a unified way.
+
+- A coroutine always completes implicitly — either:
+	- ✅ Normally (successful execution)
+	- ❗ With an exception
+	- 🚫 Via cancellation
+- ❌ No need to cancel explicitly, unless cancellation is part of the logic. Coroutines do not require explicit cancellation if you don’t need to interrupt them.
+- ✅ Once completed (Normally, With an exception or Via cancellation), the Job is no longer active.
+- 📌 Use invokeOnCompletion { throwable -> ... } to observe the final result — success, failure, or cancellation — in a unified way.
+
+### 1. ✅ Completed normally:
+   
+```
+val job = CoroutineScope(Dispatchers.Default).launch {
+    println("Task started")
+    delay(500)
+    println("Task finished")
+}
+
+job.invokeOnCompletion { throwable ->
+    println("Job Completed." + (throwable?.let { " Exception: $it" } ?: " Successfully ✅"))
+}
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Task started
+Task finished
+Job Completed. Successfully ✅
+```
+
+### 2. ❗ Completed with exception:
+
+```
+val job = CoroutineScope(Dispatchers.Default + CoroutineExceptionHandler { _, throwable -> println("Caught by CoroutineExceptionHandler: $throwable") }).launch {
+    println("Task started")
+    delay(500)
+    throw RuntimeException()
+}
+
+job.invokeOnCompletion { throwable ->
+    println("Job Completed." + (throwable?.let { " Exception: $it" } ?: " Successfully ✅"))
+}
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Task started
+Job Completed. Exception: java.lang.RuntimeException
+```
+
+3. 🚫 Cancel explicitly:
+
+```
+val job = CoroutineScope(Dispatchers.Default).launch {
+    println("Task running...")
+    delay(2000)
+}
+
+delay(500)
+job.cancel() // 🚫 Explicit cancellation
+
+job.invokeOnCompletion { throwable ->
+    println("Job Completed." + (throwable?.let { " Exception: $it" } ?: " Successfully ✅"))
+}
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Task running...
+Job Completed. Exception: kotlinx.coroutines.JobCancellationException'
+```
+
+## 🎯 Coroutine Completion: Imperative vs Declarative Exception Handling
+
+### ✅ 1. Imperative Handling (try-catch inside coroutine)
+
+- If an exception is caught inside the coroutine using try-catch, it is handled locally.
+- The exception does not propagate upward, so CoroutineExceptionHandler is not triggered.
+- The coroutine completes successfully from the job’s perspective.
+- The Job's invokeOnCompletion { throwable -> ... } gets called with throwable == null.
+
+```
+val job = CoroutineScope(Dispatchers.Default).launch {
+    try {
+        println("Task started")
+        delay(1000)
+        throw RuntimeException("Something went wrong")
+    } catch (e: Exception) {
+        println("Caught imperatively: $e")
+    }
+}
+
+job.invokeOnCompletion {
+    println("Job completed with throwable: $it") // 👉 it == null
+}
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Task started
+Caught imperatively: java.lang.RuntimeException: Something went wrong
+Job completed with throwable: null
+```
+
+### ❗ 2. Declarative Handling (Using CoroutineExceptionHandler)
+- If the exception is not caught inside the coroutine, it propagates upward.
+- If a CoroutineExceptionHandler is present (in coroutine or its parent scope), it will catch the exception declaratively.
+- The coroutine's Job completes with the throwable.
+- The invokeOnCompletion { throwable -> ... } gets called with throwable != null.
+
+```
+val job = CoroutineScope(Dispatchers.Default + CoroutineExceptionHandler { _, throwable -> println("Caught declaratively: $throwable") }).launch {
+    println("Task started")
+    delay(1000)
+    throw RuntimeException("Something went wrong")
+}
+
+job.invokeOnCompletion {
+    println("Job completed with throwable: $it") // 👉 it != null
+}
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Task started
+Caught declaratively: java.lang.RuntimeException: Something went wrong
+Job completed with throwable: java.lang.RuntimeException: Something went wrong
+```
+
+## 🧨 Why CoroutineExceptionHandler Is Not Invoked on Cancellation
+
+- ✅ Key Rule:
+	1. CoroutineExceptionHandler is only triggered for uncaught exceptions in root coroutines.
+	2. It is not triggered for CancellationException, because cancellation is not considered an error.
+
+```
+  val scope = CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") })
+
+    val job = scope.launch {
+        repeat(1_00_000) {
+            println("Count: $it")
+            delay(10)
+        }
+    }
+
+    job.invokeOnCompletion {
+        println("Job Completed: $it")
+    }
+
+    delay(100)
+    job.run {
+        cancel()
+        join()
+    }
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Count: 0
+Count: 1
+Count: 2
+Count: 3
+Count: 4
+Count: 5
+Count: 6
+Job Completed: kotlinx.coroutines.JobCancellationException: StandaloneCoroutine was cancelled; job=StandaloneCoroutine{Cancelled}@7d9de84e
+```
+
+## 🔥 Coroutine Scope Cancellation
+
+1. When scope.cancel() is called, all jobs launched within the scope receive a cancellation signal.
+2. When a coroutine reaches a suspension point (delay, yield, withContext, ensureActive, etc.), it throws a CancellationException if the job was canceled.
+3. If this exception is not caught, it propagates upward, and the job is canceled. If caught job and not rethrown explicitly, the coroutine may continue running until another suspension point or natural completion.
+4. If a coroutine uses withContext(NonCancellable), then that block ignores cancellation — it continues to run even after cancellation is requested, and must finish on its own.
+5. The coroutine scope remains alive as long as any job within it is running. If jobs hold strong references (like to an Activity, Fragment, or ViewModel), it may prevent GC, causing memory leaks.
+6. Once a job completes (normally or via cancellation), invokeOnCompletion is called. If the job was canceled, the exception is passed; otherwise, it's null.
+
+```
+val scope = CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") })
+
+    val job1 = scope.launch {
+        println("Task-1 stared.")
+        delay(150)
+        println("Task-1 finished.") // ❌ Not reached
+    }
+
+    val job2 = scope.launch {
+        println("Task-2 stared.")
+        delay(200)
+        println("Task-2 finished.") // ❌ Not reached
+    }
+
+    job1.invokeOnCompletion {
+        println("Job-1 Completed: $it")
+    }
+
+    job2.invokeOnCompletion {
+        println("Job-2 Completed: $it")
+    }
+
+    delay(100)
+    scope.cancel()  // 🔥 Cancels both jobs
+    joinAll(job1, job2)
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Task-1 stared.
+Task-2 stared.
+Job-1 Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@39fe891
+Job-2 Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@39fe891
+```
+
+### ⚠️ Coroutine Scope Non-Cancellable Behaviors
+
+- These are scenarios where coroutines do not immediately stop despite scope.cancel() or job.cancel() being called. They ignore or delay cancellation, potentially causing memory leaks or undesired continuation.
+
+### 🔸 1. Synchronous Execution Without Suspension Points
+
+```
+    val scope = CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") })
+
+    val job = scope.launch {
+        repeat(1_00_000) {
+            println("Count: $it")
+        }
+    }
+
+    job.invokeOnCompletion {
+        println("Job Completed: $it")
+    }
+
+    delay(10)
+    scope.cancel()
+    job.join()
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Count: 0
+...
+Count: 99999
+Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@5dd6783d
+```
+
+### 🔸 2. Try-Catch Suppressing CancellationException
+
+```
+    val scope = CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") })
+
+    val job = scope.launch {
+        repeat(1_00_000) {
+            try {
+                println("Count: $it")
+                delay(1)
+            } catch (exception: CancellationException) {
+                println("Perform clean-up")
+            }
+        }
+    }
+
+    job.invokeOnCompletion {
+        println("Job Completed: $it")
+    }
+
+    delay(10)
+    scope.cancel()
+    job.join()
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Count: 0
+Count: 1
+Count: 2
+Count: 3
+Perform clean-up
+Count: 4
+Perform clean-up
+...
+Count: 99999
+Perform clean-up
+Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@5dd6783d
+```
+
+### 🔸 3. Code Executed Under withContext(NonCancellable)
+
+```
+    val scope = CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") })
+
+    val job = scope.launch {
+        withContext(NonCancellable) {
+            repeat(1_00_000) {
+                println("Count: $it")
+                delay(10)
+            }
+        }
+    }
+
+    job.invokeOnCompletion {
+        println("Job Completed: $it")
+    }
+
+    delay(100)
+    scope.cancel()
+    job.join()
+```
+
+### 🧵 Output Snapshot (Expected)
+
+```
+Count: 0
+...
+Count: 99999
+Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@5dd6783d
+```
