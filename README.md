@@ -805,10 +805,9 @@ suspend fun main() {
 ```
 
 ### 🟠 Rule of Thumb:
-- Use catch for quick non-suspending recovery
-- Use finally for cleanup, including suspending calls
-- Don’t call suspending functions in catch after cancellation unless you're handling nested suspensions very carefully.
-
+- ✅ Use catch for quick non-suspending recovery
+- ✅ Use finally for cleanup, including suspending calls
+- ❌ Don’t call suspending functions in catch after cancellation unless you're handling nested suspensions very carefully.
 
 ### 🟠 Job Cancellation in Synchronous / Non-Suspending Code
 - Kotlin coroutine cancellation is cooperative.
@@ -827,7 +826,6 @@ suspend fun main() {
     job.cancel() // ← Won’t stop the loop!
   ```
   Even after calling job.cancel(), the loop keeps running because there's no suspension point, and cancellation is not checked manually.
-
 
 ### ❓ Why It Happens?
 - Coroutine cancellation relies on checking the cancellation status
