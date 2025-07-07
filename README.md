@@ -60,7 +60,7 @@ interface CoroutineScope {
 ```
 val scope = CoroutineScope(Job())
 val job = scope.launch {
-// Coroutine work
+	// Coroutine work
 }
 ```
 
@@ -70,51 +70,51 @@ val job = scope.launch {
 ```
 val supervisorScope = CoroutineScope(SupervisorJob())
 val supervisorJob = supervisorScope.launch {
-// Independent child coroutines
+	// Independent child coroutines
 }
 ```
 
 ```
 suspend fun myCoroutine() {
-        val scope = CoroutineScope(Job() + Dispatchers.Default + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") } )
+    val scope = CoroutineScope(Job() + Dispatchers.Default + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") } )
 
-        val job1 = scope.launch {
-            launch {
-                println("Task-1 stared.")
-                delay(1000)
-                println("Task-1 finished.")
-            }
-            launch {
-                println("Task-2 stared.")
-                delay(2000)
-                println("Task-2 finished.")
-            }
+    val job1 = scope.launch {
+        launch {
+            println("Task-1 stared.")
+            delay(1000)
+            println("Task-1 finished.")
         }
-
-        val job2 = scope.launch {
-            launch {
-                println("Task-3 stared.")
-                delay(800)
-                println("Task-3 finished.")
-            }
-            launch {
-                println("Task-4 stared.")
-                delay(1000)
-                println("Task-4 finished.")
-            }
+        launch {
+            println("Task-2 stared.")
+            delay(2000)
+            println("Task-2 finished.")
         }
-        
-        job1.invokeOnCompletion {
-            println("Job-1 Completed.")
-        }
-
-        job2.invokeOnCompletion {
-            println("Job-2 Completed.")
-        }
-
-        joinAll(job1, job2)
-        scope.cancel()
     }
+
+    val job2 = scope.launch {
+        launch {
+            println("Task-3 stared.")
+            delay(800)
+            println("Task-3 finished.")
+        }
+        launch {
+            println("Task-4 stared.")
+            delay(1000)
+            println("Task-4 finished.")
+        }
+    }
+
+    job1.invokeOnCompletion {
+        println("Job-1 Completed.")
+    }
+
+    job2.invokeOnCompletion {
+        println("Job-2 Completed.")
+    }
+
+    joinAll(job1, job2)
+    scope.cancel()
+}
 ```
 
 ### 🟠 Coroutine Scope Reuse:
@@ -440,12 +440,11 @@ Task-2: Count-999
 - As a result, the second coroutine must wait for the first to complete.
 - This leads to sequential execution, even though launch syntactically looks concurrent.
 
-
 ### 🟠 Core Principle
 - On Dispatchers.Main, only one coroutine executes at a time because the main thread is single-threaded.
 - Without any suspension points (delay, yield, withContext), a coroutine blocks the main thread completely until it finishes.
 - Therefore, coroutines run sequentially, even if launched concurrently.
-- 🔄 What If It Hits a Suspension Point?
+- ❓ What If It Hits a Suspension Point?
     - When a coroutine reaches a suspension point like delay(), yield(), or withContext(...):
     - It suspends its execution, releases the main thread, and goes into a waiting state.
     - This gives other pending coroutines a chance to run, enabling concurrent (interleaved) behavior.
@@ -610,8 +609,6 @@ Task-1: Count-2
 Task-2: Count-2
 ...
 ```
-
----
 
 ## 🟠 Coroutine Thread Switching
 - A coroutine can start on one thread and finish on another.
