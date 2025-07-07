@@ -1,4 +1,4 @@
-# Kotlin-Coroutines
+# 🎯 Kotlin-Coroutines
 
 ● [Kotlin Coroutines and Flow for Android Development](https://www.udemy.com/course/coroutines-on-android/?couponCode=NVDINCTA35CTR)
 
@@ -8,56 +8,46 @@
 
 ---
 
-
-## What is a coroutine in Kotlin?
-
+# 🎯 Coroutine
 - In Kotlin, a coroutine is a concurrency design pattern that simplifies asynchronous code, making it more readable and easier to manage. Think of them as lightweight threads that can suspend and resume execution without blocking the underlying thread. This allows you to perform multiple tasks concurrently without the overhead of traditional threading. 
-
 - Here's a breakdown of key aspects:
-
   1. Asynchronous Programming Made Simple: 
-    Coroutines allow you to write asynchronous code (like fetching data from a network or accessing a database) in a sequential, synchronous style, which makes it much easier to reason about.
-    They help to manage long-running tasks that would otherwise block the main thread and make your app unresponsive. 
-
+    - Coroutines allow you to write asynchronous code (like fetching data from a network or accessing a database) in a sequential, synchronous style, which makes it much easier to reason about.
+    - They help to manage long-running tasks that would otherwise block the main thread and make your app unresponsive. 
   2. Suspending and Resuming: 
-    A crucial concept is the suspend function, marked with the suspend keyword.
-    When a coroutine encounters a suspend function, its execution can be suspended (paused) without blocking the thread it's running on.
-    The coroutine can then be resumed later when the suspending function has completed its work. 
-
+    - A crucial concept is the suspend function, marked with the suspend keyword.
+    - When a coroutine encounters a suspend function, its execution can be suspended (paused) without blocking the thread it's running on.
+    - The coroutine can then be resumed later when the suspending function has completed its work. 
   3. Lightweight and Efficient: 
-    Coroutines are significantly less resource-intensive than traditional threads.
-    We can run many coroutines on a single thread, enabling efficient concurrency without the high cost of creating and managing a large number of threads. 
-
+    - Coroutines are significantly less resource-intensive than traditional threads.
+    - We can run many coroutines on a single thread, enabling efficient concurrency without the high cost of creating and managing a large number of threads. 
   4. Structured Concurrency: 
-    Coroutines in Kotlin follow structured concurrency.
-    This means coroutines are launched within a specific CoroutineScope, which defines their lifecycle.
-    Structured concurrency helps to manage coroutines effectively, ensuring that they are canceled when they are no longer needed, preventing resource leaks and improving error handling. 
-
+    - Coroutines in Kotlin follow structured concurrency.
+    - This means coroutines are launched within a specific CoroutineScope, which defines their lifecycle.
+    - Structured concurrency helps to manage coroutines effectively, ensuring that they are canceled when they are no longer needed, preventing resource leaks and improving error handling. 
   5. Builders: 
-    Kotlin provides functions like launch and async to launch new coroutines.
-    launch is used for "fire and forget" tasks, where you don't need a result back.
-    async is used when you expect a result from the coroutine, returning a Deferred object that allows you to get the result using await().
+    - Kotlin provides functions like launch and async to launch new coroutines.
+    - launch is used for "fire and forget" tasks, where you don't need a result back.
+    - async is used when you expect a result from the coroutine, returning a Deferred object that allows you to get the result using await().
 
+---
 
-🔍 1. What is a CoroutineScope?
-A CoroutineScope defines where and how long your coroutines will run.
+### ❓ What is a CoroutineScope?
+- A CoroutineScope defines where and how long your coroutines will run.
+- Think of it as a container for coroutines — it keeps track of them and allows cancellation all at once.
+- Each scope comes with:
+	1. A Job (manages the lifecycle of coroutine work)
+	2. A CoroutineContext (defines how coroutines behave; it's a container for Job, Dispatcher, etc.)
+	3. A Dispatcher (decides which thread the coroutine runs on)
 
-💡 Think of it as a container for coroutines — it keeps track of them and allows cancellation all at once.
-
-Each scope comes with:
-
-1. A Job (manages the lifecycle of coroutine work)
-2. A CoroutineContext (defines how coroutines behave; it's a container for Job, Dispatcher, etc.)
-3. A Dispatcher (decides which thread the coroutine runs on)
-
-🚨 2. Why Scopes Are Required in Android?
+### ❓ Why Scopes Are Required in Android?
 1. Structured concurrency
 2. Lifecycle management
 3. Exception handling
 4. Cancellation
 5. Memory leak prevention
 
-🧬 3. Anatomy of a CoroutineScope:
+### 🟠 Anatomy of a CoroutineScope:
 
 ```
 interface CoroutineScope {
@@ -65,7 +55,7 @@ interface CoroutineScope {
 }
 ```
 
-1: Ordinary Scope
+### 1: 🟠 Ordinary Scope
 
 ```
 val scope = CoroutineScope(Job())
@@ -75,7 +65,7 @@ val job = scope.launch {
 ```
 
 
-2: Supervisor Scope
+### 2: 🟠 Supervisor Scope
 
 ```
 val supervisorScope = CoroutineScope(SupervisorJob())
@@ -83,8 +73,6 @@ val supervisorJob = supervisorScope.launch {
 // Independent child coroutines
 }
 ```
-
-Example:
 
 ```
 suspend fun myCoroutine() {
@@ -129,7 +117,7 @@ suspend fun myCoroutine() {
     }
 ```
 
-## 🚀 Coroutine Scope Reuse
+### 🟠 Coroutine Scope Reuse:
 
 - You can reuse a CoroutineScope to launch multiple coroutines — as long as it’s active (not cancelled).
 - This is safe, efficient, and encouraged:
@@ -142,7 +130,7 @@ scope.launch { println("🔸 Task-2") } // ✅ Reuse is fine
 
 ```
 
-### ❌ What Happens After scope.cancel()?
+### ❓ What Happens After scope.cancel()?
 
 ```
 val scope = CoroutineScope(Job())
@@ -153,15 +141,14 @@ scope.launch {
 }
 ```
 
-### ⚠️ Internally
-
+### 🟠 Internally
 - The coroutine is immediately cancelled
 - The scope becomes inactive
 - Any new coroutine won’t start and doesn’t start executing any logic 
 - A CancellationException is thrown internally
 - The app won’t crash
 
-### ✅ Correct Reuse Pattern
+### 🟠 Correct Reuse Pattern
 
 - To reuse after cancellation, create a new scope:
 
@@ -177,9 +164,9 @@ scope.launch { println("Task-B") } // ✅ Works
 
 ```
 
-## 🚀 CoroutineScope .launch & .async
+## 🎯 CoroutineScope .launch & .async
 
-### ✅ What is CoroutineScope.launch {}?
+### ❓ What is CoroutineScope.launch {}?
 - launch {} is an extension function on CoroutineScope
 - It is a coroutine builder — it starts a new coroutine without expecting any result.
 - It is the entry point of a coroutine inside a scope.
@@ -195,7 +182,7 @@ val job = CoroutineScope(Dispatchers.Default).launch {
 }
 ```
 
-### ✅ What is CoroutineScope.async {}?
+### ❓ What is CoroutineScope.async {}?
 - async {} is an extension function on CoroutineScope
 - It is a coroutine builder — used to start a new coroutine that returns a result
 - It is also an entry point into a coroutine
@@ -208,42 +195,28 @@ val job = CoroutineScope(Dispatchers.Default).launch {
 
 ```
 val deferred: Deferred<Int> = CoroutineScope(Dispatchers.Default).async {
-	println("🧮 Calculating...")
+	println("Calculating...")
     77
 }
 
 val result = deferred.await()
-println("✅ Result: $result")
+println("Result: $result")
 ```
 
-### 🧱 Coroutine Builders – launch {} and async {}
-✅ CoroutineScope.launch {} and CoroutineScope.async {} are coroutine builders
-used to spawn child coroutines that inherit the job and context from the surrounding scope or coroutine.
+### 🟠 Coroutine Builders – launch {} and async {}
+- CoroutineScope.launch {} and CoroutineScope.async {} are coroutine builders used to spawn child coroutines that inherit the job and context from the surrounding scope or coroutine.
 
 ---
 
-## 📘 Kotlin Coroutines – Ordinary Job Behavior with Exception Flow
+## 🎯 Jobs
 
-### 🔰 What is an Ordinary Job?
+### ❓ What is an Ordinary Job?
+- An Ordinary Job in Kotlin Coroutines is created using Job() without any additional supervision logic. It represents a coroutine's lifecycle and propagates cancellation down and up the coroutine hierarchy.
+- If any child coroutine fails, it cancels the parent job, which then cancels all other sibling coroutines. This is the default behavior of structured concurrency.
+- If any child coroutine fails, the entire job hierarchy gets cancelled.
+- This is useful when you want fail-fast behavior — like in structured concurrency.
 
-An **Ordinary Job** in Kotlin Coroutines is created using `Job()` without any additional supervision logic. It represents a coroutine's lifecycle and propagates cancellation **down** and **up** the coroutine hierarchy.
-
-> 🔥 **Key Rule:**  
-> If any child coroutine fails, it **cancels the parent job**, which then cancels all other sibling coroutines. This is the default behavior of structured concurrency.
-
----
-
-### 🔗 Core Principle: Ordinary Job is Strict
-
-> If any child coroutine fails, the **entire job hierarchy gets cancelled**.
-
-This is useful when you want **fail-fast behavior** — like in structured concurrency.
-
----
-
-### 🧪 Example: Understanding Ordinary Job Cancellation
-
-```kotlin
+```
 suspend fun myCoroutine() {
     val scope = CoroutineScope(
         Job() + Dispatchers.Default +
@@ -295,8 +268,7 @@ suspend fun myCoroutine() {
 
 ```
 
-### 🧵 Output Snapshot (Expected)
-
+**Output:**
 ```
 Task-1 stared.
 Task-2 stared.
@@ -308,25 +280,15 @@ CoroutineExceptionHandler: java.lang.RuntimeException
 Job-1 Completed. Exception: java.lang.RuntimeException
 ```
 
-### 📌 What Happens Internally?
+### ❓ What Happens Internally?
+- All tasks are launched in the same CoroutineScope, which uses an ordinary Job() as its context.
+- Task-2 throws a RuntimeException after 1 second.
+- Because the scope uses an ordinary Job, the failure:
+  - Cancels job1.
+  - Propagates upward and cancels the entire CoroutineScope.
+  - Consequently, job2 is also cancelled—even though its child tasks (Task-3, Task-4) are unrelated and running fine.
 
-All tasks are launched in the same `CoroutineScope`, which uses an **ordinary `Job()`** as its context.
-
-- `Task-2` throws a `RuntimeException` after 1 second.
-- Because the scope uses an **ordinary Job**, the failure:
-  - Cancels `job1`.
-  - Propagates upward and cancels the entire `CoroutineScope`.
-  - Consequently, `job2` is also cancelled—even though its child tasks (`Task-3`, `Task-4`) are unrelated and running fine.
-
-
-### ❗ Important Rule of Ordinary Job
-
-    In a coroutine hierarchy built on a regular Job(),
-    if any child fails, the entire scope and all siblings are cancelled.
-
-This behavior ensures structured concurrency, but can be too aggressive in scenarios where tasks are independent.
-
-### ✅ Visual Hierarchy
+### 💡 Visual Hierarchy
 
 ```
 CoroutineScope (Job)
@@ -339,27 +301,14 @@ CoroutineScope (Job)
     └── Task-4
 ```
 
----
+### ❓ What is a SupervisorJob?
 
-## 📘 Kotlin Coroutines – SupervisorJob Behavior with Exception Isolation
+- A SupervisorJob is a special kind of Job in Kotlin Coroutines where the failure of a child does not cancel its siblings or the parent scope.
+- It provides exception isolation, which means that one coroutine's failure does not bring down the whole scope.
+- If any child coroutine fails, only that child is cancelled — the rest continue unaffected.
+- This is ideal when you want resilience and isolation, not fail-fast behavior.
 
-### 🔰 What is a SupervisorJob?
-
-A **SupervisorJob** is a special kind of `Job` in Kotlin Coroutines where the failure of a child **does not cancel its siblings** or the parent scope.
-
-> 💡 It provides **exception isolation**, which means that one coroutine's failure **does not bring down the whole scope**.
-
-### 🔗 Core Principle: SupervisorJob is Tolerant
-
-> If any child coroutine fails, **only that child is cancelled** — the rest continue unaffected.
-
-This is ideal when you want **resilience and isolation**, not fail-fast behavior.
-
----
-
-### 🧪 Example: Understanding SupervisorJob Isolation
-
-```kotlin
+```
 suspend fun myCoroutine() {
     val supervisorScope = CoroutineScope(
         SupervisorJob() + Dispatchers.Default +
@@ -410,25 +359,15 @@ suspend fun myCoroutine() {
 }
 ```
 
-### 🔍 What Happens Internally?
+### ❓ What Happens Internally?
+- All tasks are launched in the same CoroutineScope, which uses a SupervisorJob().
+- Task- throws a RuntimeException after 1 second.
+- Since the scope uses a SupervisorJob:
+	- Only Task-2 fails and is cancelled.
+  	- job1 finishes because Task-1 is unaffected.
+  	- job2 and its children (Task-3, Task-4) continue to run normally.
 
-All tasks are launched in the same `CoroutineScope`, which uses a **SupervisorJob()**.
-
-- `Task-2` throws a `RuntimeException` after 1 second.
-- Since the scope uses a **SupervisorJob**:
-  - Only `Task-2` fails and is cancelled.
-  - `job1` finishes because `Task-1` is unaffected.
-  - `job2` and its children (`Task-3`, `Task-4`) continue to run normally.
-
-
-
-
-### ❗ Important Rule of SupervisorJob
-
-    In a coroutine hierarchy built on a SupervisorJob(),
-    If any child fails, only that child is cancelled, others continue normally.
-
-### ✅ Visual Hierarchy
+### 💡 Visual Hierarchy
 
 ```
 CoroutineScope (SupervisorJob)
@@ -441,28 +380,26 @@ CoroutineScope (SupervisorJob)
     └── Task-4 ✅
 ```
 
-## 📘 `Dispatchers.Main` in Android
+---
 
-### 🚀 What is `Dispatchers.Main`?
+## 🎯 Dispatchers.Main
 
-`Dispatchers.Main` is a coroutine dispatcher designed to run coroutines on the **main (UI) thread** of Android.
-
-It is used for:
-- UI updates
-- ViewModel coroutine launching (`viewModelScope`)
-- Observing LiveData / Flows
-- Safe interaction with Android Views
+### ❓ What is Dispatchers.Main?
+- Dispatchers.Main is a coroutine dispatcher designed to run coroutines on the main (UI) thread of Android.
+- It is used for:
+	- UI updates
+	- ViewModel coroutine launching (viewModelScope)
+	- Observing LiveData / Flows
+	- Safe interaction with Android Views
 
 ### ⚠️ Main Dispatcher – Concurrent but Not Parallel
-
 - Coroutines on Dispatchers.Main can start at the same time (concurrently), but they execute one at a time (not in parallel).
-
 - That’s because:
   1. The Main thread is single-threaded
   2. Only one coroutine can run at any given moment
   3. Others are suspended and resumed in order
  
-### 🧪 Example: Synchronous (Sequential) behaviour
+### 🟠 Synchronous (Sequential) behaviour
 
  ```
   class MyViewModel : ViewModel() {
@@ -483,7 +420,7 @@ It is used for:
 }
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Task-1: Count-0
@@ -494,8 +431,7 @@ Task-2: Count-0
 Task-2: Count-999
 ```
 
-### 🧠 Behavior
-
+### 🟠 Behavior
 - viewModelScope uses Dispatchers.Main by default.
 - Android’s Main thread is single-threaded, meaning it cannot run multiple tasks in parallel.
 - Both launch {} blocks are submitted concurrently, but they are scheduled on the same thread.
@@ -505,8 +441,7 @@ Task-2: Count-999
 - This leads to sequential execution, even though launch syntactically looks concurrent.
 
 
-### ❗ Core Principle
-
+### 🟠 Core Principle
 - On Dispatchers.Main, only one coroutine executes at a time because the main thread is single-threaded.
 - Without any suspension points (delay, yield, withContext), a coroutine blocks the main thread completely until it finishes.
 - Therefore, coroutines run sequentially, even if launched concurrently.
@@ -517,9 +452,7 @@ Task-2: Count-999
     - Execution resumes when the suspension completes (e.g., after delay time or background task).
     - At this point, coroutine behavior switches from synchronous (sequential) to concurrent (interleaved) — but still not parallel.
 
----
-
-### 🧪 Example: Concurrent (Interleaved) behaviour
+### 🟠 Concurrent (Interleaved) behaviour
 
  ```
 class MyViewModel : ViewModel() {
@@ -542,7 +475,7 @@ class MyViewModel : ViewModel() {
 }
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Task-1: Count-0
@@ -554,8 +487,7 @@ Task-2: Count-2
 ...
 ```
 
-### 🧠 Behavior: Concurrent (Interleaved)
-
+### 🟠 Behavior: Concurrent (Interleaved)
 - viewModelScope.launch {} creates two coroutines on the Main dispatcher.
 - Each coroutine executes repeat(1000) with a delay(100) after every print.
 - delay() is a suspension point that:
@@ -563,7 +495,7 @@ Task-2: Count-2
 - Suspends the current coroutine without blocking the UI.
 - Allows the other coroutine to resume and run.
 
-### 🔁 Execution Cycle
+### 🟠 Execution Cycle
 
 ```
 Main Thread
@@ -575,22 +507,19 @@ delay(100) → suspends → back to Task-1
 ...
 ```
 
-### ❗ Important Reminder
+### 🟠 Important Reminder
  - Coroutines are not parallel on Dispatchers.Main — they are just interleaved using suspension.
  - No two coroutines run at the same moment, but they take turns efficiently by suspending and resuming.
-   
----
 
-## 📘 Dispatchers.Default in Kotlin Coroutines
+## 🎯 Dispatchers.Default
 
-### 🚀 What is Dispatchers.Default?
+### ❓ What is Dispatchers.Default?
 
 - Dispatchers.Default is a coroutine dispatcher optimized for CPU-intensive tasks.
 - It runs coroutines on a shared pool of background threads, allowing true parallelism, and the number of threads is based on available CPU cores: (at least 2), and typically equal to the number of cores (2, 4, 8, etc.)
 - Coroutines launched with Dispatchers.Default can run simultaneously in parallel on multiple threads.
 - Suspension points (yield, delay, withContext, etc.) are not required for parallelism.
 - It also runs coroutines concurrently, especially when many coroutines share the same thread — similar to Dispatchers.Default is when the number of coroutines exceeds the available CPU threads.
-
 - It is used for:
 	- Sorting large lists
 	- Performing heavy calculations
@@ -598,7 +527,7 @@ delay(100) → suspends → back to Task-1
 	- Executing pure computational logic without blocking the main thread
 
 
-### 🧪 Example: Parallel (Asynchronous) behaviour
+### 🟠 Parallel (Asynchronous) behaviour:
 
  ```
 class MyViewModel : ViewModel() {
@@ -619,7 +548,7 @@ class MyViewModel : ViewModel() {
 }
  ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Task-1: Count-0
@@ -631,33 +560,25 @@ Task-2: Count-2
 ...
 ```
 
----
+## 🎯 Dispatchers.IO
 
-## 📘 Dispatchers.IO in Kotlin Coroutines
-
-### 🚀 What is Dispatchers.IO?
-
-	- Dispatchers.IO is a coroutine dispatcher optimized for I/O-bound operations.
-	- It uses a shared thread pool with a larger number of threads than Dispatchers.Default.
- 	- Dispatchers.IO can run a large number of coroutines concurrently, even if some block.
-	- It starts with a few threads but can expand up to 64 threads to handle blocking tasks efficiently.
-	- If multiple coroutines share the same thread (e.g., >64 coroutines), they still run concurrently using suspension (delay, withContext, yield, etc.).
-
-	- It is used for:
-		- Reading/writing files
-		- Database access
-		- Network calls (Retrofit, HTTP, etc.)
-		- Any long-running blocking I/O task
-
-
-### 🧠 Behavior
-
-	✅ Designed for blocking I/O tasks — it's okay if a coroutine blocks a thread for a while.
-    ✅ Can grow its thread pool dynamically, up to 64 threads (default upper limit).
-    ✅ Coroutines run concurrently, even when sharing threads — by suspending at I/O points.
+### ❓ What is Dispatchers.IO?
+- Dispatchers.IO is a coroutine dispatcher optimized for I/O-bound operations.
+- It uses a shared thread pool with a larger number of threads than Dispatchers.Default.
+- Dispatchers.IO can run a large number of coroutines concurrently, even if some block.
+- It starts with a few threads but can expand up to 64 threads to handle blocking tasks efficiently.
+- If multiple coroutines share the same thread (e.g., >64 coroutines), they still run concurrently using suspension (delay, withContext, yield, etc.).
+- It is used for:
+	- Reading/writing files
+	- Database access
+	- Network calls (Retrofit, HTTP, etc.)
+	- Any long-running blocking I/O task
+- Designed for blocking I/O tasks — it's okay if a coroutine blocks a thread for a while.
+- Can grow its thread pool dynamically, up to 64 threads (default upper limit).
+- Coroutines run concurrently, even when sharing threads — by suspending at I/O points.
 
 
-### 🧪 Example: Parallel (Asynchronous) behaviour
+### 🟠 Parallel (Asynchronous) behaviour:
 
  ```
 class MyViewModel : ViewModel() {
@@ -678,7 +599,7 @@ class MyViewModel : ViewModel() {
 }
  ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Task-1: Count-0
@@ -692,21 +613,20 @@ Task-2: Count-2
 
 ---
 
-## 🔁 Coroutine Thread Switching
+## 🟠 Coroutine Thread Switching
+- A coroutine can start on one thread and finish on another.
+- Coroutines are not tightly bound to a single thread — they’re bound to a dispatcher, which may assign different threads across suspension/resume points.
+- It applies to:
+	- Dispatchers.Default
+	- Dispatchers.IO
+	- Dispatchers.Unconfined (if it suspends)
+	- Any custom coroutine dispatcher
+- Exceptions:
+	- On Dispatchers.Main (Android UI), it will always resume on the same Main thread.
+	- If you use a newSingleThreadContext, coroutine will resume on the same thread to guarantee sequential behavior.
 
-	- A coroutine can start on one thread and finish on another.
-	- Coroutines are not tightly bound to a single thread — they’re bound to a dispatcher, which may assign different threads across suspension/resume points.
- 	- It applies to:
-  		- Dispatchers.Default
-		- Dispatchers.IO
-		- Dispatchers.Unconfined (if it suspends)
-		- Any custom coroutine dispatcher
-	- Exceptions:
-		- On Dispatchers.Main (Android UI), it will always resume on the same Main thread.
-		- If you use a newSingleThreadContext, coroutine will resume on the same thread to guarantee sequential behavior.
 
-
-### 🧪 Example: Thread Switch After Suspension
+### 🟠 Thread Switch After Suspension:
 
 ```
 fun main() = runBlocking {
@@ -718,27 +638,23 @@ fun main() = runBlocking {
 }
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Started on: DefaultDispatcher-worker-1
 Resumed on: DefaultDispatcher-worker-3
 ```
 
----
+## 🎯 Coroutine Cancellation
 
-## ❌ Coroutine Cancellation
-
-### Job Cancellation at Suspension Points:
-
-🚦 Cancellation in Kotlin Coroutines
-	- Cancellation in coroutines is cooperative —
-	- The coroutine must reach a suspension point to respond to cancellation.
- 	- A suspension point is a place where the coroutine pauses and checks for cancellation. 
-  	- Most common:
-		- delay()
-		- yield()
-		- withContext()
+### 🟠 Job Cancellation at Suspension Points:
+- Cancellation in coroutines is cooperative.
+- The coroutine must reach a suspension point to respond to cancellation.
+- A suspension point is a place where the coroutine pauses and checks for cancellation. 
+- Most common:
+	- delay()
+	- yield()
+	- withContext()
 
 ```
   suspend fun main() {
@@ -755,18 +671,13 @@ Resumed on: DefaultDispatcher-worker-3
 }
 ```
 
-
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Task started on DefaultDispatcher-worker-1
 ```
 
-✅ Then, cancellation happens — the coroutine never finishes.
-
----
-
-### ⚠️ What Happens Inside Suspension Point on Cancellation
+### ❓ What Happens Inside Suspension Point on Cancellation
 - When a coroutine is cancelled during a suspension point like delay(), yield(), or withContext, that suspending function implicitly throws a CancellationException.
 
 ```
@@ -806,11 +717,11 @@ suspend fun main() {
 }
 ```
 
-### ⚠️ Why Rethrow?
+### ❓ Why Rethrow?
 - If you suppress CancellationException and don’t explicitly rethrow it, the parent coroutine may never know its child was cancelled. 
 - That breaks the coroutine hierarchy and can cause silent bugs or leaked coroutines.
 
-✅ Pattern to Follow
+### 🟠 Pattern to Follow:
 
 ```
 try {
@@ -834,7 +745,7 @@ launch {
 }
 ```
 
-### ⚠️ Non-Reachable Code After Suspension in catch
+### 🟠 Non-Reachable Code After Suspension in catch:
 
 ```
 suspend fun main() {
@@ -859,8 +770,7 @@ suspend fun main() {
 }
 ```
 
-#### 🔥 What Happens Internally?
-
+### ❓ What Happens Internally?
 - Coroutine starts and hits delay(5000)
 - After 1 sec, you call job.cancel() → This cancels the coroutine and implicitly throws CancellationException
 - The catch block catches it explicitly. 
@@ -871,8 +781,7 @@ suspend fun main() {
 - Code like performCleanUp() and ```throw exception``` never run
 - It’s like throwing another exception while handling an exception, so the remaining code is lost.
 
-#### ✅ How to Fix It?
-
+### ❓ How to Fix It?
 - Use a non-suspending cleanup approach in catch, or move suspending cleanup into a finally block (which runs safely even during cancellation):
 
 ```
@@ -898,14 +807,13 @@ suspend fun main() {
 }
 ```
 
-#### 🧠 Rule of Thumb
-✅ Use catch for quick non-suspending recovery
-✅ Use finally for cleanup, including suspending calls
-❌ Don’t call suspending functions in catch after cancellation unless you're handling nested suspensions very carefully.
+### 🟠 Rule of Thumb:
+- Use catch for quick non-suspending recovery
+- Use finally for cleanup, including suspending calls
+- Don’t call suspending functions in catch after cancellation unless you're handling nested suspensions very carefully.
 
 
-### Job Cancellation in Synchronous / Non-Suspending Code
-
+### 🟠 Job Cancellation in Synchronous / Non-Suspending Code
 - Kotlin coroutine cancellation is cooperative.
 - If your coroutine never suspends, it will not respond to cancellation.
 - So if you write code like this:
@@ -924,18 +832,17 @@ suspend fun main() {
   Even after calling job.cancel(), the loop keeps running because there's no suspension point, and cancellation is not checked manually.
 
 
-### 🔥 Why It Happens?
-
+### ❓ Why It Happens?
 - Coroutine cancellation relies on checking the cancellation status
 - This check only happens at:
 	1. Implicitly: By Suspension points (delay, yield, withContext, etc.)
   				OR
 	2. Explicitly: By using isActive, ensureActive()
 
-### ✅ Solution: Cooperative Cancellation
+### 🟠 Solution: Cooperative Cancellation
 - To make non-suspending code cancellable, you must manually check:
 
-✅ 1. Using isActive
+### 🟠 1. Using isActive
 
 ```
 val job = CoroutineScope(Dispatchers.Default).launch {
@@ -956,7 +863,7 @@ val job = CoroutineScope(Dispatchers.Default).launch {
 }
 ```
 
-### 🧵 Output Snapshot (Expected):
+**Output:**
 
 ```
 Starting heavy loop
@@ -968,7 +875,7 @@ After Loop
 
 - isActive is safe when you want to exit gracefully.
 
-### Non-reachable code
+### 🟠 Non-reachable code
 
 ```
 val job = CoroutineScope(Dispatchers.Default).launch {
@@ -991,7 +898,8 @@ delay(100)
 job.cancel()
 ```
 
-### 🧵 Output Snapshot (Expected):
+**Output:**
+
 ```
 Starting heavy loop
 Count-0
@@ -999,15 +907,14 @@ Count-0
 Count-8127
 ```
 
-### ⚠️ What’s the Problem?
+### ❓ What’s the Problem?
 - When job.cancel() is called, isActive becomes false, so execution enters the else block.
 - delay(100) is a suspension point.
 - The coroutine is already cancelled, delay() checks that and implicitly throws CancellationException immediately.
 - So "Perform clean-up" is never executed, and the coroutine exits before proper cleanup. And so "After Loop" also is not executed.
 
 
-## 🛡️ withContext(NonCancellable)
-
+### 🟠 withContext(NonCancellable)
 - withContext(NonCancellable) is used to temporarily disable cancellation inside a coroutine block.
 - Even if the coroutine is cancelled, any suspending operations within this block will still execute safely.
 
@@ -1018,7 +925,8 @@ withContext(NonCancellable) { // ✅ Handles cancellation — exception won't pr
 }
 ```
 
-### ✅ Fixed with withContext(NonCancellable):
+### 🟠 Fixed with withContext(NonCancellable):
+
 ```
 val job = CoroutineScope(Dispatchers.Default).launch {
     println("Starting heavy loop")
@@ -1052,7 +960,7 @@ job.cancel()
 - It is the recommended pattern for cleanup involving suspension in a cancelled coroutine.
 
   
-✅ 2. Using ensureActive()
+### 🟠 2. Using ensureActive()
 
 ```
 val job = CoroutineScope(Dispatchers.Default).launch {
@@ -1073,7 +981,7 @@ val job = CoroutineScope(Dispatchers.Default).launch {
 }
 ```
 
-### 🧵 Output Snapshot (Expected):
+**Output:**
 
 ```
 Starting heavy loop
@@ -1083,13 +991,11 @@ Count-8127
 ```
 
 - ensureActive() is more aggressive: it throws CancellationException immediately.
-
-### 🧠 Behavior
 - When ensureActive() is used inside a coroutine, it immediately checks whether the coroutine has been cancelled. If it has, ensureActive() implicitly throws a CancellationException at that exact line. As a result, any code written after the ensureActive() call becomes unreachable and does not execute.
 - So "After Loop" is not printed here.
 
 
-### ✅ with try-catch + ensureActive()
+### 🟠 with try-catch + ensureActive()
 
 ```
 val job = CoroutineScope(Dispatchers.Default).launch {
@@ -1113,7 +1019,7 @@ delay(100)
 job.cancel()
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Starting heavy loop  
@@ -1124,17 +1030,16 @@ Count: 8127
 Perform clean-up
 ```
 
-### 🔍 What’s Happening Internally?
+### ❓ What’s Happening Internally?
 - When job.cancel() is called, it immediately sends a cancellation signal to the coroutine.
 - As the loop continues, it eventually hits ensureActive(), which checks for cancellation and implicitly throws a CancellationException.
 - The try-catch block catches this exception and runs the catch block.
 - Inside the catch, the exception is explicitly rethrown, and due to rethrowing the CancellationException from the catch block, the coroutine gets immediately cancelled.
 
-### ✅ Best Practice Reminder
+### 🟠 Best Practice Reminder
 - Always explicitly rethrow CancellationException after cleanup to maintain structured concurrency and prevent orphaned coroutines.
 
-
-### ⚠️ Suspension after Cancellation (inside catch block)
+### 🟠 Suspension after Cancellation (inside catch block)
 
 ```
 val job = CoroutineScope(Dispatchers.Default).launch {
@@ -1161,7 +1066,7 @@ delay(100)
 job.cancel()
 ```
 
-### 🔍 What’s Happening Internally?
+### ❓ What’s Happening Internally?
 - When job.cancel() is called, it immediately sends a cancellation signal to the coroutine.
 - As the loop continues, it eventually hits ensureActive(), which checks the coroutine's cancellation status and implicitly throws a CancellationException.
 - The try-catch block catches this exception explicitly and executes the catch block.
@@ -1171,13 +1076,11 @@ job.cancel()
 - Finally, the exception is explicitly rethrown inside the catch.
 - Due to this explicit rethrow of CancellationException, the coroutine exits immediately, and no further code (like "Count: $i" or "After Loop") executes.
 
-### 🔥 Key Insight:
+### 🟠 Key Insight:
 - Once a coroutine detects cancellation and throws a CancellationException,
 - If that exception is handled, the coroutine resumes "normally", and later suspension points won’t throw again unless you retrigger cancellation or manually rethrow the original exception.
 
-
-### 🔥 Goldan rule:
-
+### 🟠 Rule:
 - When job.cancel() is called, it signals the coroutine to cancel by propagating a CancellationException.
 - However, this exception is not thrown immediately — instead, it is thrown only when the coroutine reaches a suspension point such as delay(), withContext, yield(), or explicitly via ensureActive().
 - Alternatively, cancellation can be detected non-suspensively using isActive, though it won’t throw — it only returns false.
@@ -1188,19 +1091,16 @@ job.cancel()
 
 ---
 
-## 📘 Exception Handling in CoroutineScope
-
+## 🎯 Exception Handling in CoroutineScope
 - Both launch {} and CoroutineScope.launch {} start new coroutines. However, where an exception is caught depends entirely on the presence and placement of a CoroutineExceptionHandler in the coroutine context.
 
-### 🔹 Exception Propagation in launch {}
-
+### 🟠 Exception Propagation in launch {}
 - The exception thrown in a coroutine that is not caught imperatively in a try-catch does propagate the exception upward to the scope. If the coroutine's parent scope or the coroutine itself has a CoroutineExceptionHandler, it will catch the exception declaratively only in CoroutineExceptionHandler.
 - Uncatched exceptions always propagate upward till the parent scope, if the coroutine itself does not have a CoroutineExceptionHandler. And this Uncatched exceptions is oly caught by declaratively only in CoroutineExceptionHandler.
 
-## Declarative Exception Handling with CoroutineExceptionHandler
+### 🟠 Declarative Exception Handling with CoroutineExceptionHandler
 
-### 🔹 1. Coroutine-level Exception Handler
-
+### 🟠 1. Coroutine-level Exception Handler
 - If a CoroutineExceptionHandler is passed directly to the coroutine via launch(handler), then exceptions are caught locally in that coroutine:
 
 ```
@@ -1217,17 +1117,16 @@ val scope = CoroutineScope(Job())
     scope.cancel()
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
+
 ```
 Task-1 started.
 CoroutineExceptionHandler: java.lang.RuntimeException
 ```
 
-### ✅ Explanation:
 - The exception is caught by the handler attached directly to the coroutine.
 
-### 🔹 2. Scope-level Exception Handler
-
+### 🟠 2. Scope-level Exception Handler
 - If no handler is passed to the coroutine, but the CoroutineScope itself was created with a CoroutineExceptionHandler, then exceptions are caught at the scope level:
 
 ```
@@ -1244,17 +1143,15 @@ job.join()
 scope.cancel()
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 ```
 Task-1 started.
 CoroutineExceptionHandler: java.lang.RuntimeException
 ```
 
-### ✅ Explanation:
 - The exception bubbles up to the parent scope and is caught by the scope's handler.
 
-### 🔹 3. No Exception Handler — App Crashes
-
+### 🟠 3. No Exception Handler — App Crashes
 - If neither the coroutine nor the parent scope has a CoroutineExceptionHandler, then the exception goes uncaught and will crash the app or terminate the thread:
 
 ```
@@ -1271,20 +1168,21 @@ job.join()
 scope.cancel()
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
+
 ```
 Task-1 started.
 Exception in thread "DefaultDispatcher-worker-1" java.lang.RuntimeException
 ```
 
-### ❌ Explanation:
 - No handler exists to catch the exception, so the app/thread crashes.
 
-## ✅ Imperative Exception Handling Inside Coroutine Blocks
+
+### 🟠 Imperative Exception Handling Inside Coroutine Blocks
 - In Kotlin Coroutines, exceptions thrown inside a coroutine or child coroutine can be caught imperatively using a try-catch block placed within the coroutine body.
 - If an exception is caught imperatively, it will not propagate upward to the parent scope, and CoroutineExceptionHandler will not be triggered — unless the exception is re-thrown inside the catch block.
 
-### ▶️ Example 1: Handling Exception in a Single Coroutine
+### 🟠 Handling Exception in a Single Coroutine:
 
 ```
 val scope = CoroutineScope(Job())
@@ -1304,18 +1202,17 @@ job.join()
 scope.cancel()
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Task-1 started.
 Caught Exception: java.lang.RuntimeException
 ```
 
-### ✅ Explanation:
 - The exception is thrown inside the coroutine block and is caught by the internal try-catch.
 - Hence, it does not propagate upward, and no crash or CoroutineExceptionHandler is invoked.
 
-### ▶️ Example 2: Handling Exception in a Nested Child Coroutine
+### 🟠 Handling Exception in a Nested Child Coroutine:
 
 ```
 val scope = CoroutineScope(Job())
@@ -1337,30 +1234,26 @@ job.join()
 scope.cancel()
 ```
 
-### 🧵 Output Snapshot (Expected)
+Output:
 
 ```
 Task-1 started.
 Caught Exception: java.lang.RuntimeException
 ```
 
-### ✅ Explanation:
 - The inner coroutine throws an exception, but it's wrapped with an internal try-catch.
 - So, even though it’s a child coroutine, the exception is contained locally and does not propagate to the outer job or scope.
 - CoroutineExceptionHandler is not triggered because the exception was already handled.
-
-### 🧠 Core Insight
 - If a coroutine or any of its children handle exceptions imperatively using try-catch, those exceptions won’t propagate upward and will not be caught declaratively by a CoroutineExceptionHandler — unless the catch block rethrows the exception.
 
-## ❗ try-catch Around launch {} Won’t Catch Exceptions
-
-- ❌ Wrapping launch {} or CoroutineScope.launch {} inside a try-catch block does not catch coroutine exceptions.
-- ✅ Exceptions from coroutines are caught declaratively using CoroutineExceptionHandler, either:
+### 🟠 try-catch Around launch {} Won’t Catch Exceptions
+- Wrapping launch {} or CoroutineScope.launch {} inside a try-catch block does not catch coroutine exceptions.
+- Exceptions from coroutines are caught declaratively using CoroutineExceptionHandler, either:
 	- At the coroutine level (launch(handler) {}), or
 	- At the scope level (CoroutineScope(handler)).
 - If required to handle an exception imperatively, it needs to place the try-catch inside the coroutine block.
   
-### 🧪 Example 1: Scope has a CoroutineExceptionHandler
+### 🟠 Scope has a CoroutineExceptionHandler:
 
 ```
 val scope = CoroutineScope(
@@ -1384,14 +1277,14 @@ try {
 }
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Task-1 started.
 CoroutineExceptionHandler: java.lang.RuntimeException
 ```
 
-### 🧪 Example 2: Handler at the Coroutine Level
+### 🟠 Handler at the Coroutine Level:
 
 ```
 val scope = CoroutineScope(Job())
@@ -1417,20 +1310,18 @@ job.join()
 scope.cancel()
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Task-1 started.
 CoroutineExceptionHandler: java.lang.RuntimeException
 ```
 
-## 🧩 Coroutine Job Lifecycle — Completion
-
+## 🎯 Coroutine Job Lifecycle — Completion
 - A coroutine always completes implicitly — either normally, with an exception, or via cancellation.
 - No need to cancel explicitly.
 - Once completed (in any form), the Job is no longer active.
 - Use invokeOnCompletion { throwable -> ... } to monitor any of the outcomes in a unified way.
-
 - A coroutine always completes implicitly — either:
 	- ✅ Normally (successful execution)
 	- ❗ With an exception
@@ -1439,7 +1330,7 @@ CoroutineExceptionHandler: java.lang.RuntimeException
 - ✅ Once completed (Normally, With an exception or Via cancellation), the Job is no longer active.
 - 📌 Use invokeOnCompletion { throwable -> ... } to observe the final result — success, failure, or cancellation — in a unified way.
 
-### 1. ✅ Completed normally:
+### 🟠 1. Completed normally:
    
 ```
 val job = CoroutineScope(Dispatchers.Default).launch {
@@ -1453,7 +1344,7 @@ job.invokeOnCompletion { throwable ->
 }
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Task started
@@ -1461,7 +1352,7 @@ Task finished
 Job Completed. Successfully ✅
 ```
 
-### 2. ❗ Completed with exception:
+### 🟠 2. Completed with exception:
 
 ```
 val job = CoroutineScope(Dispatchers.Default + CoroutineExceptionHandler { _, throwable -> println("Caught by CoroutineExceptionHandler: $throwable") }).launch {
@@ -1475,14 +1366,14 @@ job.invokeOnCompletion { throwable ->
 }
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Task started
 Job Completed. Exception: java.lang.RuntimeException
 ```
 
-3. 🚫 Cancel explicitly:
+### 3. 🟠 Cancel explicitly:
 
 ```
 val job = CoroutineScope(Dispatchers.Default).launch {
@@ -1498,7 +1389,7 @@ job.invokeOnCompletion { throwable ->
 }
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Task running...
@@ -1507,8 +1398,7 @@ Job Completed. Exception: kotlinx.coroutines.JobCancellationException'
 
 ## 🎯 Coroutine Completion: Imperative vs Declarative Exception Handling
 
-### ✅ 1. Imperative Handling (try-catch inside coroutine)
-
+### 🟠 1. Imperative Handling (try-catch inside coroutine)
 - If an exception is caught inside the coroutine using try-catch, it is handled locally.
 - The exception does not propagate upward, so CoroutineExceptionHandler is not triggered.
 - The coroutine completes successfully from the job’s perspective.
@@ -1530,7 +1420,7 @@ job.invokeOnCompletion {
 }
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Task started
@@ -1538,7 +1428,7 @@ Caught imperatively: java.lang.RuntimeException: Something went wrong
 Job completed with throwable: null
 ```
 
-### ❗ 2. Declarative Handling (Using CoroutineExceptionHandler)
+### 🟠 2. Declarative Handling (Using CoroutineExceptionHandler)
 - If the exception is not caught inside the coroutine, it propagates upward.
 - If a CoroutineExceptionHandler is present (in coroutine or its parent scope), it will catch the exception declaratively.
 - The coroutine's Job completes with the throwable.
@@ -1556,7 +1446,7 @@ job.invokeOnCompletion {
 }
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Task started
@@ -1564,11 +1454,9 @@ Caught declaratively: java.lang.RuntimeException: Something went wrong
 Job completed with throwable: java.lang.RuntimeException: Something went wrong
 ```
 
-## 🧨 Why CoroutineExceptionHandler Is Not Invoked on Cancellation
-
-- ✅ Key Rule:
-	1. CoroutineExceptionHandler is only triggered for uncaught exceptions in root coroutines.
-	2. It is not triggered for CancellationException, because cancellation is not considered an error.
+## 🎯 Why CoroutineExceptionHandler Is Not Invoked on Cancellation
+1. CoroutineExceptionHandler is only triggered for uncaught exceptions in root coroutines.
+2. It is not triggered for CancellationException, because cancellation is not considered an error.
 
 ```
   val scope = CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") })
@@ -1591,7 +1479,7 @@ Job completed with throwable: java.lang.RuntimeException: Something went wrong
     }
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Count: 0
@@ -1604,8 +1492,7 @@ Count: 6
 Job Completed: kotlinx.coroutines.JobCancellationException: StandaloneCoroutine was cancelled; job=StandaloneCoroutine{Cancelled}@7d9de84e
 ```
 
-## 🔥 Coroutine Scope Cancellation
-
+## 🎯 Coroutine Scope Cancellation
 1. When scope.cancel() is called, all jobs launched within the scope receive a cancellation signal.
 2. When a coroutine reaches a suspension point (delay, yield, withContext, ensureActive, etc.), it throws a CancellationException if the job was canceled.
 3. If this exception is not caught, it propagates upward, and the job is canceled. If caught job and not rethrown explicitly, the coroutine may continue running until another suspension point or natural completion.
@@ -1641,7 +1528,7 @@ val scope = CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> pr
     joinAll(job1, job2)
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Task-1 stared.
@@ -1650,11 +1537,10 @@ Job-1 Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled;
 Job-2 Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@39fe891
 ```
 
-### ⚠️ Coroutine Scope Non-Cancellable Behaviors
-
+### 🟠 Coroutine Scope Non-Cancellable Behaviors
 - These are scenarios where coroutines do not immediately stop despite scope.cancel() or job.cancel() being called. They ignore or delay cancellation, potentially causing memory leaks or undesired continuation.
 
-### 🔸 1. Synchronous Execution Without Suspension Points
+### 🟠 1. Synchronous Execution Without Suspension Points:
 
 ```
     val scope = CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") })
@@ -1674,7 +1560,7 @@ Job-2 Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled;
     job.join()
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Count: 0
@@ -1683,7 +1569,7 @@ Count: 99999
 Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@5dd6783d
 ```
 
-### 🔸 2. Try-Catch Suppressing CancellationException
+### 🟠 2. Try-Catch Suppressing CancellationException:
 
 ```
     val scope = CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") })
@@ -1708,7 +1594,7 @@ Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; j
     job.join()
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Count: 0
@@ -1724,7 +1610,7 @@ Perform clean-up
 Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@5dd6783d
 ```
 
-### 🔸 3. Code Executed Under withContext(NonCancellable)
+### 🟠 3. Code Executed Under withContext(NonCancellable):
 
 ```
     val scope = CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") })
@@ -1747,7 +1633,7 @@ Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; j
     job.join()
 ```
 
-### 🧵 Output Snapshot (Expected)
+**Output:**
 
 ```
 Count: 0
@@ -1756,8 +1642,7 @@ Count: 99999
 Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@5dd6783d
 ```
 
-## ❓ Why There's No Need to Call Job.cancel() Explicitly (Unless You Intend to Cancel It)
-
+## 🎯 Why There's No Need to Call Job.cancel() Explicitly (Unless You Intend to Cancel It)
 - Coroutines Complete Automatically. Every coroutine completes implicitly when:
 	- It reaches the end of execution (normal completion)
 	- It throws an exception (exceptional completion)
@@ -1770,9 +1655,7 @@ Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; j
 - If no strong references to the job remain (e.g., from ViewModel, Fragment, Activity, etc.), then the job object becomes eligible for Garbage Collection.
 - Also, CoroutineScope.cancel() sends a cancellation signal to all associated Jobs, which leads to their implicit cancellation — that’s why the Job gets cancelled automatically.
 
-
-## ❓ Why Explicitly Cancelling a CoroutineScope?
-
+## 🎯 Why Explicitly Cancelling a CoroutineScope?
 - All coroutines are launched within a CoroutineScope, and each coroutine is backed by a Job. Once all associated coroutines complete — either normally, with an uncaught exception, or due to cancellation — their corresponding Job objects become eligible for GC.
 - However, the CoroutineScope itself remains active and not eligible for GC even after all child jobs complete, unless it is explicitly cancelled. This becomes especially important when a scope is created using the CoroutineScope interface and tied to a context like a ViewModel, Activity, or custom component.
 - If the underlying context is destroyed (e.g., the Activity/Fragment is closed or the ViewModel is cleared), but the scope is not cancelled, then:
@@ -1784,31 +1667,30 @@ Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; j
 	“If you create your own CoroutineScope using the CoroutineScope() function, it is your responsibility to cancel it when it's no longer needed.”
 	```
 
-## ❓ Why You Should Avoid Creating Custom CoroutineScopes in Android
+## 🎯 Why You Should Avoid Creating Custom CoroutineScopes in Android
 
-### 📜 Official Android Guidance:
-	```
+### 🟡 Official Android Guidance:
+```
 	“Avoid creating your own CoroutineScope in components like Activities, Fragments, or ViewModels. Instead, use lifecycle-aware scopes like viewModelScope, lifecycleScope, or repeatOnLifecycle.”
- 	```
-
+ ```
 - Why:
 	1. ✅ Lifecycle Awareness Built-In:
-		Scopes like viewModelScope and lifecycleScope are automatically cancelled:
-			viewModelScope → when ViewModel.onCleared() is called
-			lifecycleScope → when the lifecycle reaches DESTROYED
-		This means you don’t have to manually call scope.cancel(), and there's no risk of leaking coroutines.
+		- Scopes like viewModelScope and lifecycleScope are automatically cancelled:
+			1. viewModelScope → when ViewModel.onCleared() is called
+			2. lifecycleScope → when the lifecycle reaches DESTROYED
+		- This means you don’t have to manually call scope.cancel(), and there's no risk of leaking coroutines.
 
 	2. ⚠️ Custom Scopes Are Manual & Risky
-		If you use CoroutineScope(Job()) or similar in an Activity/Fragment:
-		You must manually call scope.cancel() in onDestroy()
-		If you forget? 🔥 Memory leaks, zombie coroutines, or wasted CPU running in the background
-		Android warns that many developers forget this manual step — causing real-world app issues
+		- If you use CoroutineScope(Job()) or similar in an Activity/Fragment:
+		- You must manually call scope.cancel() in onDestroy()
+		- If you forget? 🔥 Memory leaks, zombie coroutines, or wasted CPU running in the background
+		- Android warns that many developers forget this manual step — causing real-world app issues
 
 	3. 📦 Lifecycle-Aware Scopes Are Well-Tested
-		Provided scopes (viewModelScope, lifecycleScope) are:
-			✅ Tested
-			✅ Integrated with Jetpack Lifecycle components
-			✅ Less boilerplate
-			✅ Error-proof
+		- Provided scopes (viewModelScope, lifecycleScope) are:
+			- ✅ Tested
+			- ✅ Integrated with Jetpack Lifecycle components
+			- ✅ Less boilerplate
+			- ✅ Error-proof
 - Custom CoroutineScopes should be avoided in Android unless you are managing lifecycle yourself.
 - Prefer viewModelScope, lifecycleScope, or rememberCoroutineScope() — they handle cleanup automatically and protect your app from memory leaks and wasted background work.
