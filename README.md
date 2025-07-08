@@ -1661,15 +1661,15 @@ Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; j
 	- And if any jobs or references linger, it can cause memory leaks and resource waste.
 - Therefore, when creating a scope manually (e.g., CoroutineScope(Job()) or CoroutineScope(SupervisorJob())), it is highly recommended to call scope.cancel() explicitly — even if all jobs are already completed — to allow proper cleanup and garbage collection of the scope itself.
 - The Kotlin documentation explicitly recommends:
-  	```
-	“If you create your own CoroutineScope using the CoroutineScope() function, it is your responsibility to cancel it when it's no longer needed.”
-	```
+```
+“If you create your own CoroutineScope using the CoroutineScope() function, it is your responsibility to cancel it when it's no longer needed.”
+```
 
 ## 🎯 Why You Should Avoid Creating Custom CoroutineScopes in Android
 
 ### 🟡 Official Android Guidance:
 ```
-	“Avoid creating your own CoroutineScope in components like Activities, Fragments, or ViewModels. Instead, use lifecycle-aware scopes like viewModelScope, lifecycleScope, or repeatOnLifecycle.”
+“Avoid creating your own CoroutineScope in components like Activities, Fragments, or ViewModels. Instead, use lifecycle-aware scopes like viewModelScope, lifecycleScope, or repeatOnLifecycle.”
  ```
 - Why:
 	1. ✅ Lifecycle Awareness Built-In:
