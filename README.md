@@ -1244,8 +1244,9 @@ Caught Exception: java.lang.RuntimeException
 ### 🟠 try-catch Around launch {} Won’t Catch Exceptions
 - Wrapping launch {} or CoroutineScope.launch {} inside a try-catch block does not catch coroutine exceptions.
 - Exceptions from coroutines are caught declaratively using CoroutineExceptionHandler, either:
-	- At the coroutine level (launch(handler) {}), or
-	- At the scope level (CoroutineScope(handler)).
+	- At the coroutine level (launch(handler) {})
+  						OR
+	- At the scope level (CoroutineScope(handler))
 - If required to handle an exception imperatively, it needs to place the try-catch inside the coroutine block.
   
 ### 🟠 Scope has a CoroutineExceptionHandler:
@@ -1311,6 +1312,8 @@ scope.cancel()
 Task-1 started.
 CoroutineExceptionHandler: java.lang.RuntimeException
 ```
+
+- A CoroutineExceptionHandler is invoked only for uncaught exceptions in root coroutines that are launched directly by a scope without a parent coroutine and it ignored in child coroutines because the exception propagates up to the parent context.
 
 ## 🎯 Coroutine Job Lifecycle — Completion
 - A coroutine always completes implicitly — either normally, with an exception, or via cancellation.
