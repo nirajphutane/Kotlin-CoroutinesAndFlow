@@ -1704,6 +1704,13 @@ Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; j
 - All child coroutines launched inside coroutineScope are bound to the parent and follow structured concurrency rules.
 - In coroutineScope { }, all coroutines launched inside it are regular child coroutines under the same Job. So, failure of any one child cancels all other children, and the first exception is rethrown.
 
+```
+val result = coroutineScope {
+    launch { }
+	"Result"
+}
+```
+
 ### 🟠 Nesting in coroutineScope:
 
 **1. Parent-Child**
@@ -1785,7 +1792,7 @@ coroutineScope-2-> Count: 9
         try {
             coroutineScope{
                 delay(10)
-		throw RuntimeException()
+				throw RuntimeException()
             }
         } catch (e: Exception) {
             println("Caught Exception: $e")
@@ -1866,6 +1873,13 @@ CoroutineExceptionHandler: java.lang.RuntimeException
 - All child coroutines launched inside supervisorScope are bound to the parent and follow structured concurrency rules.
 - In supervisorScope { }, all coroutines launched directly inside it are treated as Independent & Top-level child coroutines under a SupervisorJob. So, the failure of one does not cancel others.
 
+```
+val result = supervisorScope {
+    launch { } // Top-level coroutine
+	"Result"
+}
+```
+
 **1. Parent-Child:** 
 - supervisorScope { } always takes context from the parent, but replaces the parent Job with a SupervisorJob, while retaining other context elements like Dispatcher and ExceptionHandler.
 - So nested supervisorScope blocks are parent-child with each other contextually, but exception handling is isolated — failure of a child doesn't cancel its siblings.
@@ -1885,9 +1899,15 @@ supervisorScope { // A (Parent of B)
 
 ```
 CoroutineScope(Job()).launch {    // Parent
-    supervisorScope { } // Child-A: Has an independent SupervisorJob
-    supervisorScope { } // Child-B: Has an independent SupervisorJob
-    // Both are Peers of each other
+    supervisorScope {
+        launch {  } // Top-level coroutine
+        launch {  } // Top-level coroutine
+    } // Child-A: Has an independent SupervisorJob
+    supervisorScope {
+        launch {  } // Top-level coroutine
+        launch {  } // Top-level coroutine
+    } // Child-B: Has an independent SupervisorJob
+    // Both Child A & B are Peers of each other
 }
 ```
 
@@ -1896,7 +1916,7 @@ CoroutineScope(Job()).launch {
 
     // First supervisorScope starts and completes fully before the second begins
     supervisorScope {
-        launch {
+        launch {	// Top-level coroutine in this scope
             repeat(10) {
                 println("supervisorScope-1-> Count: $it")
                 delay(10)
@@ -1906,7 +1926,7 @@ CoroutineScope(Job()).launch {
 
     // Second supervisorScope starts only after the first completes
     supervisorScope {
-        launch {
+        launch {	// Top-level coroutine in this scope
             repeat(10) {
                 println("supervisorScope-2-> Count: $it")
                 delay(10)
