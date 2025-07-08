@@ -1,10 +1,4 @@
-# 🎯 Kotlin-Coroutines
-
-● [Kotlin Coroutines and Flow for Android Development](https://www.udemy.com/course/coroutines-on-android/?couponCode=NVDINCTA35CTR)
-
----
-
-![Kotlin Coroutines and Flow for Android Development](https://github.com/user-attachments/assets/11008b26-e3a2-473a-8b5e-eaee062f16b2)
+# 🎯 Kotlin Coroutines Android Development
 
 ---
 
@@ -1692,3 +1686,369 @@ Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; j
 			- ✅ Error-proof
 - Custom CoroutineScopes should be avoided in Android unless you are managing lifecycle yourself.
 - Prefer viewModelScope, lifecycleScope, or rememberCoroutineScope() — they handle cleanup automatically and protect your app from memory leaks and wasted background work.
+
+---
+
+## 🎯suspend fun coroutineScope { }
+- coroutineScope is a suspending function that creates a new coroutine scope inside the current suspending function or coroutine.
+- It does not launch a coroutine by itself; instead, it provides a scope where you can launch child coroutines using launch, async, etc.
+- It suspends the caller until all child coroutines inside the block complete, giving it a synchronous behavior from the caller’s perspective.
+- If any child coroutine fails with an exception, all other children are automatically cancelled, and the first exception is re-thrown to the caller.
+- The scope created by coroutineScope inherits the context (e.g., Job, Dispatcher, CoroutineExceptionHandler) from its parent.
+- It ensures structured concurrency by guaranteeing that all launched coroutines complete or fail before the surrounding coroutine resumes.
+- If the outer coroutine is cancelled, the coroutineScope and all its children are also cancelled automatically.
+- coroutineScope { } does not return a Job or CoroutineScope. It returns the result of the lambda block, if any.
+- So cannot explicitly cancel coroutineScope from outside using .cancel() like with launch or async.
+- The scope created by coroutineScope inherits the parent coroutine's context, including its Job.
+- If the parent scope or coroutine is cancelled, then coroutineScope is implicitly cancelled.
+- All child coroutines launched inside coroutineScope are bound to the parent and follow structured concurrency rules.
+- In coroutineScope { }, all coroutines launched inside it are regular child coroutines under the same Job. So, failure of any one child cancels all other children, and the first exception is rethrown.
+
+### 🟠 Nesting in coroutineScope:
+
+**1. Parent-Child**
+- coroutineScope {} always takes context from the parent, which means it always inherits from the parent, that why they are children of the parent scope, so nested coroutine scopes are always parent-child of each other respectively.
+- If a parent coroutineScope { } is cancelled due to its parent coroutine or scope being cancelled, then all nested coroutineScope { } blocks and their child coroutines are also implicitly cancelled.
+- This behavior ensures proper structured concurrency and lifecycle tracking — the parent cannot finish until all nested scopes complete or fail.
+
+ ```
+coroutineScope { // A (Parent of B)
+    coroutineScope { // B (Child of A)
+        // Inherits context from the parent coroutineScope
+    }
+}
+ ```
+
+**2. Peers:**
+- Principle-separated coroutineScope within same CoroutineScope(Job).launch {} are peers. As per job sharing, they can look siblings, but not as per execution nature. The first scope will execute and after complete second will start and so due to this nature they are peers not siblings.
+
+```
+CoroutineScope(Job()).launch {	// Parent
+	coroutineScope{ } // Child-A: Have parent context
+	coroutineScope{ } // Child-B: Have parent context
+	// Both are Peers of each other
+}
+```
+
+```
+CoroutineScope(Job()).launch {
+    
+    // First coroutineScope starts and completes fully before the second begins
+    coroutineScope {
+        repeat(10) {
+            println("coroutinScope-1-> Count: $it")
+            delay(10)
+        }
+    }
+
+    // Second coroutineScope starts only after the first completes
+    coroutineScope {
+        repeat(10) {
+            println("coroutinScope-2-> Count: $it")
+            delay(10)
+        }
+    }
+
+}.run {
+    join()
+    cancel()
+}
+```
+
+**Output:**
+
+```
+coroutineScope-1-> Count: 0
+...
+coroutineScope-1-> Count: 9
+coroutineScope-2-> Count: 0
+...
+coroutineScope-2-> Count: 9
+```
+
+### 🟠 Exception handling:
+- coroutineScope is a suspend function that provides a new scope to launch child coroutines.
+- This new scope inherits the context (like Dispatcher and Job) from its parent but creates its own new Job, forming the root of a structured concurrency block.
+- All child coroutines launched inside this scope are tied to this new Job.
+- If any child coroutine fails with an exception, it cancels the entire scope (i.e., the new Job), and all sibling coroutines are cancelled as well.
+- The thrown exception is not caught by any CoroutineExceptionHandler attached to the child coroutine launch(CoroutineExceptionHandler) inside coroutineScope {}.
+- Instead, the exception bubbles up and is thrown from the suspend function itself, so it must be:
+	- Handled imperatively using try-catch around the coroutineScope {} call
+									OR
+	- Handled declaratively by a CoroutineExceptionHandler in the parent coroutine or scope
+- This strict behavior ensures structured concurrency: a coroutineScope will not complete until all of its children complete successfully or one fails and the failure is handled.
+
+1. 🟠 Imperatively using try-catch:
+
+```
+ CoroutineScope(Job()).launch {
+        try {
+            coroutineScope{
+                delay(10)
+				throw RuntimeException()
+            }
+        } catch (e: Exception) {
+            println("Caught Exception: $e")
+        }
+    }.join()
+```
+   
+```
+ CoroutineScope(Job()).launch {
+        try {
+            coroutineScope{
+                launch(CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") }) {
+                    delay(10)
+                    throw RuntimeException()
+                }
+            }
+        } catch (e: Exception) {
+            println("Caught Exception: $e")
+        }
+    }.join()
+```
+
+**Output:**
+
+```
+Caught Exception: java.lang.RuntimeException
+```
+
+
+2. 🟠 Declaratively by a CoroutineExceptionHandler:
+   
+```
+CoroutineScope(Job()+CoroutineExceptionHandler{ _, throwable-> println("CoroutineExceptionHandler: $throwable") }).launch {
+        coroutineScope{
+            launch {
+                delay(10)
+                throw RuntimeException()
+            }
+        }
+    }.join()
+```
+
+**Output:**
+
+```
+CoroutineExceptionHandler: java.lang.RuntimeException
+```
+---
+
+## 🎯suspend fun supervisorScope { }
+- supervisorScope is a suspending function that creates a new coroutine scope with a SupervisorJob, allowing child coroutines to operate independently in terms of failure.
+- Like coroutineScope, it does not launch a coroutine by itself; you launch child coroutines using launch, async, etc., within the block.
+- It suspends the caller until all child coroutines inside it complete, providing synchronous behavior within the suspending function.
+- If any child coroutine fails, the other children continue unaffected — they are not cancelled automatically, unlike in coroutineScope.
+- Only if an exception escapes the scope (i.e., not caught in children), the first uncaught exception is re-thrown to the caller after all children complete.
+- It inherits the context from the outer coroutine, replacing the existing Job with a SupervisorJob.
+- It also supports structured concurrency, but with failure isolation between child coroutines.
+- If the outer coroutine is cancelled, the supervisorScope and all its children are also cancelled.
+- supervisorScope { } does not return a Job or CoroutineScope. It returns the result of the lambda block, if any.
+- So cannot explicitly cancel supervisorScope from outside using .cancel() like with launch or async.
+- The scope created by supervisorScope inherits the parent coroutine's context, but replaces the Job with a SupervisorJob.
+- If the parent scope or coroutine is cancelled, then supervisorScope is implicitly cancelled.
+- All child coroutines launched inside supervisorScope are bound to the parent and follow structured concurrency rules.
+- In supervisorScope { }, all coroutines launched directly inside it are treated as Independent & Top-level child coroutines under a SupervisorJob. So, the failure of one does not cancel others.
+
+**1. Parent-Child:** 
+- supervisorScope { } always takes context from the parent, but replaces the parent Job with a SupervisorJob, while retaining other context elements like Dispatcher and ExceptionHandler.
+- So nested supervisorScope blocks are parent-child with each other contextually, but exception handling is isolated — failure of a child doesn't cancel its siblings.
+- If a parent supervisorScope { } is cancelled due to its parent coroutine or scope being cancelled, then all nested supervisorScope { } blocks and their child coroutines are also implicitly cancelled.
+- This behavior still supports structured concurrency, while allowing failure independence among children.
+
+```
+supervisorScope { // A (Parent of B)
+    supervisorScope { // B (Child of A)
+        // Inherits context but uses a new SupervisorJob
+    }
+}
+```
+
+**2. Peers:**
+- Principle-separated supervisorScope within same CoroutineScope(Job()).launch { } are peers. They share the same parent context (Dispatcher, ExceptionHandler), but each has its own independent SupervisorJob. As per job sharing, they may appear to be siblings, but due to sequential structure and isolated supervision, they are peers by context, not by execution or failure behavior. The first scope runs to completion, then the next starts.
+
+```
+CoroutineScope(Job()).launch {    // Parent
+    supervisorScope { } // Child-A: Has an independent SupervisorJob
+    supervisorScope { } // Child-B: Has an independent SupervisorJob
+    // Both are Peers of each other
+}
+```
+
+```
+CoroutineScope(Job()).launch {
+
+    // First supervisorScope starts and completes fully before the second begins
+    supervisorScope {
+        launch {
+            repeat(10) {
+                println("supervisorScope-1-> Count: $it")
+                delay(10)
+            }
+        }
+    }
+
+    // Second supervisorScope starts only after the first completes
+    supervisorScope {
+        launch {
+            repeat(10) {
+                println("supervisorScope-2-> Count: $it")
+                delay(10)
+            }
+        }
+    }
+
+}.run {
+    join()
+    cancel()
+}
+```
+
+**Output:**
+
+```
+supervisorScope-1-> Count: 0
+...
+supervisorScope-1-> Count: 9
+supervisorScope-2-> Count: 0
+...
+supervisorScope-2-> Count: 9
+```
+
+### 🟠 Exception handling:
+- suspend fun supervisorScope {} inherits the coroutine context from its parent but has its own SupervisorJob.
+- All coroutines launched directly inside this scope are top-level coroutines and structured children of the SupervisorJob — they are independent in failure, so if one child fails, it does not cancel other children.
+- If a child coroutine throws an exception, it can be caught:
+	Imperatively, using try-catch inside that coroutine
+							OR
+	Declaratively, if it is a root coroutine with its own CoroutineExceptionHandler
+- If the exception is not caught, it is not rethrown by the supervisorScope suspend function itself.
+- Instead, it propagates upward through the coroutine context, and can be handled declaratively by a CoroutineExceptionHandler in the parent scope.
+- If the parent scope does not have a CoroutineExceptionHandler, then the coroutine will fail and crash the program.
+- However, if an exception is thrown directly inside the body of the suspend function (not from a child coroutine), then supervisorScope {} will rethrow that exception, and it can be handled:
+	Imperatively, using try-catch around the supervisorScope call
+							OR
+	Declaratively, using a CoroutineExceptionHandler in the parent scope
+
+1. 🟠 Imperatively using try-catch:
+   
+```
+CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") }).launch {
+    try {
+        supervisorScope {
+            println("Task stated")
+            delay(10)
+            throw RuntimeException()
+        }
+    } catch (e: Exception) {
+        println("Caught Exception: $e")
+    }
+}.run{
+    join()
+    cancel()
+}
+```
+
+**Output:**
+
+```
+Task stated
+Caught Exception: java.lang.RuntimeException
+```
+
+2. 🟠 Declaratively by a CoroutineExceptionHandler:
+
+```
+CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") }).launch {
+    try {
+        supervisorScope {
+            launch {
+                println("Task stated")
+                delay(10)
+                throw RuntimeException()
+            }
+        }
+    } catch (e: Exception) {
+        println("Caught Exception: $e")
+    }
+}.run{
+    join()
+    cancel()
+}
+```
+
+**Output:**
+
+```
+Task stated
+CoroutineExceptionHandler: java.lang.RuntimeException
+```
+
+3. 🟠 Declaratively by a child Coroutines CoroutineExceptionHandler:
+
+```
+CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") }).launch {
+    try {
+        supervisorScope {
+            launch(CoroutineExceptionHandler{ _, throwable -> println("Inner-CoroutineExceptionHandler: $throwable") }) {
+                println("Task stated")
+                delay(10)
+                throw RuntimeException()
+            }
+        }
+    } catch (e: Exception) {
+        println("Caught Exception: $e")
+    }
+}.run{
+	join()
+	cancel()
+}
+```
+
+**Output:**
+
+```
+Task stated
+Inner-CoroutineExceptionHandler: java.lang.RuntimeException
+```
+
+4. 🟠 Declaratively by a CoroutineExceptionHandler even nested inside coroutineScope{ }:
+
+```
+CoroutineScope(Job() + CoroutineExceptionHandler{ _, throwable -> println("CoroutineExceptionHandler: $throwable") }).launch {
+    try {
+        coroutineScope{
+            supervisorScope {
+                launch {
+                    println("Task stated")
+                    delay(10)
+                    throw RuntimeException()
+                }
+            }
+        }
+    } catch (e: Exception) {
+        println("Caught Exception: $e")
+    }
+}.run{
+    join()
+    cancel()
+}
+```
+
+**Output:**
+
+```
+Task stated
+CoroutineExceptionHandler: java.lang.RuntimeException
+```
+
+---
+---
+● [Kotlin Coroutines and Flow for Android Development](https://www.udemy.com/course/coroutines-on-android/?couponCode=NVDINCTA35CTR)
+
+---
+
+![Kotlin Coroutines and Flow for Android Development](https://github.com/user-attachments/assets/11008b26-e3a2-473a-8b5e-eaee062f16b2)
+
+---
