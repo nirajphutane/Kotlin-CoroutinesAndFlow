@@ -1785,7 +1785,22 @@ coroutineScope-2-> Count: 9
         try {
             coroutineScope{
                 delay(10)
-				throw RuntimeException()
+		throw RuntimeException()
+            }
+        } catch (e: Exception) {
+            println("Caught Exception: $e")
+        }
+    }.join()
+```
+
+```
+ CoroutineScope(Job()).launch {
+        try {
+            coroutineScope{
+                launch {
+                    delay(10)
+                    throw RuntimeException()
+                }
             }
         } catch (e: Exception) {
             println("Caught Exception: $e")
