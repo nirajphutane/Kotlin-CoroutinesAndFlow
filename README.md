@@ -1085,7 +1085,7 @@ job.cancel()
 
 ### 🟠 Exception Propagation in launch {}
 - The exception thrown in a coroutine that is not caught imperatively in a try-catch does propagate the exception upward to the scope. If the coroutine's parent scope or the coroutine itself has a CoroutineExceptionHandler, it will catch the exception declaratively only in CoroutineExceptionHandler.
-- Uncatched exceptions always propagate upward till the parent scope, if the coroutine itself does not have a CoroutineExceptionHandler. And this Uncatched exceptions is oly caught by declaratively only in CoroutineExceptionHandler.
+- Uncatched exceptions always propagate upward till the parent scope, if the coroutine itself does not have a CoroutineExceptionHandler. And this uncaught exceptions is only caught by declaratively only in CoroutineExceptionHandler.
 
 ### 🟠 Declarative Exception Handling with CoroutineExceptionHandler
 
@@ -1659,7 +1659,7 @@ Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; j
 “If you create your own CoroutineScope using the CoroutineScope() function, it is your responsibility to cancel it when it's no longer needed.”
 ```
 
-## 🎯 Why You Should Avoid Creating Custom CoroutineScopes in Android
+## 🎯 Why You Should Avoid Creating Custom CoroutineScopes in Android?
 
 ### 🟡 Official Android Guidance:
 ```
@@ -1687,6 +1687,47 @@ Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; j
 - Custom CoroutineScopes should be avoided in Android unless you are managing lifecycle yourself.
 - Prefer viewModelScope, lifecycleScope, or rememberCoroutineScope() — they handle cleanup automatically and protect your app from memory leaks and wasted background work.
 
+### 🟠 Nested Scopes Are Isolated
+- In Kotlin Coroutines, even when one CoroutineScope is created inside another, they remain completely independent — they do not form a parent-child relationship unless explicitly linked through the same job.
+
+```
+CoroutineScope(Job()).launch {                // Scope-A
+
+    CoroutineScope(Job()).launch { }          // Scope-B
+
+    CoroutineScope(Job()).launch { }          // Scope-C
+}
+```
+
+- At first glance, it may seem that Scope-A is the parent and Scope-B and Scope-C are its children or siblings — but that’s an illusion.
+- In reality: Each CoroutineScope(Job()) creates a new, standalone job hierarchy.
+- They do not share a parent job, and hence are not part of the same coroutine family tree.
+
+### 🟠 Behavior Summary of Nested CoroutineScopes
+
+1. ⚠️ Cancellation:
+- Each CoroutineScope(Job()) creates a separate coroutine hierarchy.
+- Cancelling one scope (e.g., Scope-A) sends a cancellation signal only to its own coroutines, not to other nested scopes like Scope-B or Scope-C.
+- Likewise, if Scope-B or Scope-C is cancelled, it does not affect Scope-A or its siblings.
+- Cancellation is strictly scoped. No scope can cancel another unless they share the same job or parent context.
+
+2. 🚫 Exception:
+- If an uncaught exception is thrown in one scope (e.g., Scope-B), it stays within that scope.
+- The exception does not propagate to outer scopes or sibling scopes.
+- The only way to catch it is:
+	- Imperatively, using try-catch inside the coroutine.
+   							OR
+	- Declaratively, using a CoroutineExceptionHandler in the same scope.
+- Exceptions are not shared across different scopes. This avoids unwanted failures spilling into unrelated coroutine hierarchies.
+
+3. ✅ Completion
+- Each scope manages its own lifecycle independently.
+- When Scope-A completes (normally or due to cancellation), it does not wait for Scope-B or Scope-C to complete, and vice versa.
+
+### 🟠 Summary:
+- Even if coroutine scopes are written one inside another, they are logically isolated.
+- They do not form parent-child or sibling relationships unless they share the same context or job.
+
 ---
 
 ## 🎯suspend fun coroutineScope { }
@@ -1707,7 +1748,7 @@ Job Completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; j
 ```
 val result = coroutineScope {
     launch { }
-	"Result"
+    "Result"
 }
 ```
 
