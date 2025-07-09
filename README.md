@@ -1711,6 +1711,56 @@ val result = coroutineScope {
 }
 ```
 
+```
+suspend fun myCoroutine() {
+    val scope = CoroutineScope(Job())
+
+    scope.launch {
+        try {
+            coroutineScope {
+                launch {
+                    println("Task-1 stared.")
+                    delay(1000)
+                    throw RuntimeException()
+                }.invokeOnCompletion {
+                    println("Coroutine-1 is completed. Error: $it")
+                }
+                launch {
+                    println("Task-2 stared.")
+                    delay(2000)
+                    println("Task-2 finished.")
+                }.invokeOnCompletion {
+                    println("Coroutine-2 is completed. Error: $it")
+                }
+                "Tasks 1 & 2 are completed"
+            }.run {
+                println("Status CS: $this")
+            }
+        } catch (e: Exception) {
+            println("Caught Exception: $e")
+        }
+    }.run {
+        invokeOnCompletion {
+            println("Job is completed. Error: $it")
+        }
+        join()
+    }
+
+    scope.cancel()
+}
+```
+
+**Output:**
+
+```
+Task-1 stared.
+Task-2 stared.
+Coroutine-1 is completed. Error: java.lang.RuntimeException
+Coroutine-2 is completed. Error: kotlinx.coroutines.JobCancellationException: Parent job is Cancelling; job=ScopeCoroutine{Cancelling}@3a133d77
+Caught Exception: java.lang.RuntimeException
+Job is completed. Error: null
+```
+
 ### 🟠 Nesting in coroutineScope:
 
 **1. Parent-Child**
@@ -1879,6 +1929,55 @@ val result = supervisorScope {
 	"Result"
 }
 ```
+
+```
+suspend fun myCoroutine() {
+    val scope = CoroutineScope(Job()+CoroutineExceptionHandler{_, throwable -> println("CoroutineExceptionHandler: $throwable") })
+
+    scope.launch {
+        supervisorScope {
+            launch {
+                println("Task-1 stared.")
+                delay(1000)
+                throw RuntimeException()
+            }.invokeOnCompletion {
+                println("Coroutine-1 is completed. Error: $it")
+            }
+            launch {
+                println("Task-2 stared.")
+                delay(2000)
+                println("Task-2 finished.")
+            }.invokeOnCompletion {
+                println("Coroutine-2 is completed. Error: $it")
+            }
+            "Tasks 1 & 2 are completed"
+        }.run {
+            println("Status CS: $this")
+        }
+    }.run {
+        invokeOnCompletion {
+            println("Job is completed. Error: $it")
+        }
+        join()
+    }
+
+    scope.cancel()
+}
+```
+
+**Output:**
+
+```
+Task-1 stared.
+Task-2 stared.
+CoroutineExceptionHandler: java.lang.RuntimeException
+Coroutine-1 is completed. Error: java.lang.RuntimeException
+Task-2 finished.
+Coroutine-2 is completed. Error: null
+Status CS: Tasks 1 & 2 are completed
+Job is completed. Error: null
+```
+
 
 **1. Parent-Child:** 
 - supervisorScope { } always takes context from the parent, but replaces the parent Job with a SupervisorJob, while retaining other context elements like Dispatcher and ExceptionHandler.
