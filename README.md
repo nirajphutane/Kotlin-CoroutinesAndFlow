@@ -1711,6 +1711,80 @@ CoroutineScope(Job()).launch {                // Scope-A
 - Likewise, if Scope-B or Scope-C is cancelled, it does not affect Scope-A or its siblings.
 - Cancellation is strictly scoped. No scope can cancel another unless they share the same job or parent context.
 
+```
+suspend fun main () {
+    val scope1 = CoroutineScope(Job())
+    val scope2 = CoroutineScope(Job())
+
+    val job = scope1.launch {
+
+        delay(100)
+        scope2.launch {
+            launch {
+                println("Scope-2 coroutine is started")
+                repeat(1000) {
+                    println("Scope-2: Coroutine -> Count: $it")
+                    delay(10)
+                }
+                println("Scope-2 coroutine is finished")
+            }.invokeOnCompletion {
+                println("Scope-2 coroutine is completed: $it")
+            }
+        }.invokeOnCompletion {
+            println("Scope-2 is completed: $it")
+        }
+
+        launch {
+            println("Scope-1 coroutine is started")
+            repeat(1000) {
+                println("Scope-1: Coroutine -> Count: $it")
+                delay(10)
+            }
+            println("Scope-1 coroutine is finished")
+        }.invokeOnCompletion {
+            println("Scope-1 coroutine is completed: $it")
+        }
+
+    }
+
+    job.invokeOnCompletion {
+        println("Scope-1 is completed: $it")
+    }
+
+    delay(1000)
+    scope1.cancel()
+    println("Scope-1 cancelled")
+
+    delay(2000)
+    scope2.cancel()
+    println("Scope-2 cancelled")
+}
+```
+
+**Output:**
+
+```
+Scope-2 coroutine is started
+Scope-1 coroutine is started
+Scope-1: Coroutine -> Count: 0
+Scope-2: Coroutine -> Count: 0
+Scope-1: Coroutine -> Count: 1
+Scope-2: Coroutine -> Count: 1
+...
+Scope-2: Coroutine -> Count: 52
+Scope-1: Coroutine -> Count: 52
+Scope-1 cancelled
+Scope-1 coroutine is completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@1d744bbd
+Scope-1 is completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@1d744bbd
+Scope-2: Coroutine -> Count: 53
+...
+Scope-2: Coroutine -> Count: 172
+Scope-2 cancelled
+Scope-2 coroutine is completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@3a70f639
+Scope-2 is completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@3a70f639
+```
+  
+
 2. 🚫 Exception:
 - If an uncaught exception is thrown in one scope (e.g., Scope-B), it stays within that scope.
 - The exception does not propagate to outer scopes or sibling scopes.
@@ -1720,9 +1794,91 @@ CoroutineScope(Job()).launch {                // Scope-A
 	- Declaratively, using a CoroutineExceptionHandler in the same scope.
 - Exceptions are not shared across different scopes. This avoids unwanted failures spilling into unrelated coroutine hierarchies.
 
+```
+suspend fun main () {
+    val scope1 = CoroutineScope(Job())
+    val scope2 = CoroutineScope(Job() + CoroutineExceptionHandler{_, throwable -> println("Scope-2:- CoroutineExceptionHandler: $throwable") })
+
+    scope1.launch {
+
+        launch {
+            println("Scope-1 coroutine is started")
+            delay(2000)
+            println("Scope-1 coroutine is finished")
+        }.invokeOnCompletion {
+            println("Scope-1 coroutine is completed: $it")
+        }
+
+        scope2.launch {
+            launch {
+                println("Scope-2 coroutine is started")
+                delay(1000)
+                throw RuntimeException()
+                println("Scope-2 coroutine is finished")
+            }.invokeOnCompletion {
+                println("Scope-2 coroutine is completed: $it")
+            }
+        }.invokeOnCompletion {
+            println("Scope-2 is completed: $it")
+        }
+    }.run {
+        invokeOnCompletion {
+            println("Scope-1 is completed: $it")
+        }
+        join()
+    }
+    scope1.cancel()
+    scope2.cancel()
+}
+```
+
+**Output:**
+
+```
+Scope-1 coroutine is started
+Scope-2 coroutine is started
+Scope-2 coroutine is completed: java.lang.RuntimeException
+Scope-2:- CoroutineExceptionHandler: java.lang.RuntimeException
+Scope-2 is completed: java.lang.RuntimeException
+Scope-1 coroutine is finished
+Scope-1 coroutine is completed: null
+Scope-1 is completed: null
+```
+
 3. ✅ Completion
 - Each scope manages its own lifecycle independently.
 - When Scope-A completes (normally or due to cancellation), it does not wait for Scope-B or Scope-C to complete, and vice versa.
+
+```
+suspend fun main () {
+    val scope1 = CoroutineScope(Job())
+    val scope2 = CoroutineScope(Job())
+
+    scope1.launch {
+        
+        scope2.launch {
+            delay(2000)
+        }.invokeOnCompletion {
+            println("Scope-2 is completed: $it")
+        }
+
+        delay(1000)
+    }.invokeOnCompletion {
+        println("Scope-1 is completed: $it")
+    }
+    
+    delay(3100)
+    scope1.cancel()
+    scope2.cancel()
+}
+```
+
+**Output:**
+
+```
+Scope-1 is completed: null
+Scope-2 is completed: null
+```
 
 ### 🟠 Summary:
 - Even if coroutine scopes are written one inside another, they are logically isolated.
