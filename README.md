@@ -1925,7 +1925,7 @@ CoroutineExceptionHandler: java.lang.RuntimeException
 
 ```
 val result = supervisorScope {
-    launch { } // Top-level coroutine
+    launch { }	// Top-level coroutine
 	"Result"
 }
 ```
