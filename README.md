@@ -2162,57 +2162,33 @@ Scope-1 is completed: null
 - This is part of structured concurrency: the parent job won’t complete until all of its children (direct or indirect) are finished.
 - invokeOnCompletion executes after all children complete, and provides insight into how the job finished.
 
-```
-suspend fun main () {
-    val job = Job()
-    val scope1 = CoroutineScope(job)
-    val scope2 = CoroutineScope(job)
-
-    scope1.launch {
-
-        scope2.launch {
-            delay(2000)
-        }.invokeOnCompletion {
-            println("Scope-2 Coroutine is completed: $it")
-        }
-
-        delay(1000)
-    }.invokeOnCompletion {
-        println("Scope-1 Coroutine is completed: $it")
-    }
-
-    job.invokeOnCompletion {
-        println("Job is completed: $it")
-    }
-
-    delay(3100)
-    scope1.cancel()
-    scope2.cancel()
-}
-```
-
-**Output:**
-
-```
-Scope-1 is completed: null
-Scope-2 is completed: null
-```
-
-### 🟠 Summary:
-
 
 ---
 
 ### 🟠 Nested Coroutines with individual Jobs Are Isolated
 
+- If a coroutine is launched with its own Job(), then:
+	1. It breaks structured concurrency with the parent — it won’t be cancelled when the parent is cancelled.
+	2. It becomes a separate coroutine with an independent lifecycle.
+	3. It is not a true child of the parent — even if visually nested, it is not linked to the parent’s job.
+	4. It still inherits other context elements (like Dispatcher, CoroutineName) from the parent if not explicitly overridden, but not the Job.
+		- A coroutine cannot set a default dispatcher; it inherits unless provided explicitly.
+	5. It forms a new coroutine hierarchy — separate from the parent — and is excluded from the parent’s cancellation, exception handling, and structured waiting.
+
 1. Cancellation:
+- When a coroutine is launched with its own Job(), it is not linked to the parent’s job hierarchy.
+- If the parent scope or coroutine is cancelled, the coroutine with its own job will not be cancelled — it continues to run independently.
+- Likewise, if this coroutine is cancelled, it does not affect the parent or sibling coroutines — they continue to run.
+- To cancel such a coroutine, you must explicitly cancel its Job using the reference.
+- This breaks structured concurrency, making lifecycle management manual and isolated.
+   
 ```
 suspend fun main () {
-    val scope = CoroutineScope(Job() + CoroutineExceptionHandler{_, throwable -> println("Outer scope:- CoroutineExceptionHandler: $throwable") })
+    val scope = CoroutineScope(Job())
 
     val job = scope.launch {
 
-        launch(Job()) {
+        launch(Job()) {    // Injecting a new Job — breaks parent relationship!
             println("Task-1 is started")
             repeat(1000) {
                 println("Coroutine-A -> Count: $it")
@@ -2271,59 +2247,177 @@ Task-1 is finished
 Coroutine-1 is completed: null
 ```
 
-2. Exception:
-
 ```
-
 suspend fun main () {
-    val scope1 = CoroutineScope(Job())
-    val scope2 = CoroutineScope(Job() + CoroutineExceptionHandler{_, throwable -> println("Scope-2:- CoroutineExceptionHandler: $throwable") })
+    val scope = CoroutineScope(Job())
 
-    scope1.launch {
+    val job = scope.launch {
+
+        launch(Job()) {     // Injecting a new Job — breaks parent relationship!
+            println("Task-1 is started")
+            repeat(1000) {
+                println("Coroutine-A -> Count: $it")
+                delay(10)
+            }
+            println("Task-1 is finished")
+        }.invokeOnCompletion {
+            println("Coroutine-1 is completed: $it")
+        }
 
         launch {
-            println("Scope-1 coroutine is started")
-            delay(2000)
-            println("Scope-1 coroutine is finished")
+            println("Task-2 is started")
+            repeat(1000) {
+                println("Coroutine-B -> Count: $it")
+                delay(10)
+            }
+            println("Task-2 is finished")
         }.invokeOnCompletion {
-            println("Scope-1 coroutine is completed: $it")
+            println("Coroutine-2 is completed: $it")
         }
 
-        scope2.launch {
-            launch {
-                println("Scope-2 coroutine is started")
-                delay(1000)
-                throw RuntimeException()
-                println("Scope-2 coroutine is finished")
-            }.invokeOnCompletion {
-                println("Scope-2 coroutine is completed: $it")
-            }
-        }.invokeOnCompletion {
-            println("Scope-2 is completed: $it")
-        }
-    }.run {
-        invokeOnCompletion {
-            println("Scope-1 is completed: $it")
-        }
-        join()
     }
-    scope1.cancel()
-    scope2.cancel()
+
+    job.invokeOnCompletion {
+        println("Coroutine is completed: $it")
+    }
+
+    delay(500)
+    job.cancel()
+    println("Job cancelled")
+
+    delay(20000)
+    scope.cancel()
 }
 ```
 
 **Output:**
 
 ```
-Scope-1 coroutine is started
-Scope-2 coroutine is started
-Scope-2 coroutine is completed: java.lang.RuntimeException
-Scope-2:- CoroutineExceptionHandler: java.lang.RuntimeException
-Scope-2 is completed: java.lang.RuntimeException
-Scope-1 coroutine is finished
-Scope-1 coroutine is completed: null
-Scope-1 is completed: null
+Task-1 is started
+Coroutine-A -> Count: 0
+Task-2 is started
+Coroutine-B -> Count: 0
+Coroutine-A -> Count: 1
+...
+Coroutine-B -> Count: 29
+Coroutine-A -> Count: 29
+Job cancelled
+Coroutine-2 is completed: kotlinx.coroutines.JobCancellationException: StandaloneCoroutine was cancelled; job=StandaloneCoroutine{Cancelling}@68698b33
+Coroutine is completed: kotlinx.coroutines.JobCancellationException: StandaloneCoroutine was cancelled; job=StandaloneCoroutine{Cancelled}@68698b33
+Coroutine-A -> Count: 30
+...
+Coroutine-A -> Count: 999
+Task-1 is finished
+Coroutine-1 is completed: null
 ```
+
+2. Exception:
+- When a coroutine has its own Job(), it must handle exceptions either:
+- Imperatively using try-catch inside the coroutine, or
+- Declaratively by adding its own CoroutineExceptionHandler in its coroutine context.
+- The exception will not propagate to the parent scope or coroutine.
+- The parent’s CoroutineExceptionHandler will not catch it.
+- Other sibling coroutines remain unaffected and will continue to run independently.
+
+```
+suspend fun main () {
+    val scope = CoroutineScope(Job() + CoroutineExceptionHandler{_, throwable -> println("scope:- CoroutineExceptionHandler: $throwable") })
+
+    val job = scope.launch {
+
+        launch(Job() + CoroutineExceptionHandler{_, throwable -> println("Coroutine-1:- CoroutineExceptionHandler: $throwable") }) {
+            println("Task-1 is started")
+            delay(2000)
+            println("Task-1 is finished")
+        }.invokeOnCompletion {
+            println("Coroutine-1 is completed: $it")
+        }
+
+        launch {
+            println("Task-2 is started")
+            delay(1000)
+            throw RuntimeException()
+            println("Task-2 is finished")
+        }.invokeOnCompletion {
+            println("Coroutine-2 is completed: $it")
+        }
+
+    }
+
+    job.invokeOnCompletion {
+        println("Coroutine is completed: $it")
+    }
+
+    delay(3000)
+    scope.cancel()
+}
+```
+
+**Output:**
+
+```
+Task-1 is started
+Task-2 is started
+Coroutine-2 is completed: java.lang.RuntimeException
+scope:- CoroutineExceptionHandler: java.lang.RuntimeException
+Coroutine is completed: java.lang.RuntimeException
+Task-1 is finished
+Coroutine-1 is completed: null
+```
+
+```
+suspend fun main () {
+    val scope = CoroutineScope(Job() + CoroutineExceptionHandler{_, throwable -> println("scope:- CoroutineExceptionHandler: $throwable") })
+
+    val job = scope.launch {
+
+        launch(Job() + CoroutineExceptionHandler{_, throwable -> println("Coroutine-1:- CoroutineExceptionHandler: $throwable") }) {
+            println("Task-1 is started")
+            delay(1000)
+            throw RuntimeException()
+            println("Task-1 is finished")
+        }.invokeOnCompletion {
+            println("Coroutine-1 is completed: $it")
+        }
+
+        launch {
+            println("Task-2 is started")
+            delay(2000)
+            println("Task-2 is finished")
+        }.invokeOnCompletion {
+            println("Coroutine-2 is completed: $it")
+        }
+
+    }
+
+    job.invokeOnCompletion {
+        println("Coroutine is completed: $it")
+    }
+
+    delay(3000)
+    scope.cancel()
+}
+```
+
+**Output:**
+
+```
+Task-1 is started
+Task-2 is started
+Coroutine-1:- CoroutineExceptionHandler: java.lang.RuntimeException
+Coroutine-1 is completed: java.lang.RuntimeException
+Task-2 is finished
+Coroutine-2 is completed: null
+Coroutine is completed: null
+```
+
+3. Completion:
+- A coroutine with its own Job() is independent, so:
+- It completes independently, either normally or with an exception or cancellation.
+- Its completion is not awaited by the parent unless explicitly done using job.join().
+- The parent or sibling coroutines do not wait for this coroutine to complete.
+- Similarly, its completion (success or failure) does not affect the parent or other coroutines.
+
 ---
 
 ## 🎯suspend fun coroutineScope { }
