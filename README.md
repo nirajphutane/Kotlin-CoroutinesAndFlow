@@ -1972,10 +1972,11 @@ Scope-2 isActive: false
 
 ```
 suspend fun main () {
-    val scope1 = CoroutineScope(Job())
-    val scope2 = CoroutineScope(Job())
+    val job = Job()
+    val scope1 = CoroutineScope(job)
+    val scope2 = CoroutineScope(job)
 
-    val job = scope1.launch {
+    val job1 = scope1.launch {
 
         delay(100)
         scope2.launch {
@@ -2006,17 +2007,16 @@ suspend fun main () {
 
     }
 
-    job.invokeOnCompletion {
+    job1.invokeOnCompletion {
         println("Scope-1 is completed: $it")
     }
 
     delay(1000)
     scope1.cancel()
     println("Scope-1 cancelled")
-
+    println("Scope-1 isActive: ${scope1.isActive}")
+    println("Scope-2 isActive: ${scope2.isActive}")
     delay(2000)
-    scope2.cancel()
-    println("Scope-2 cancelled")
 }
 ```
 
@@ -2030,12 +2030,15 @@ Scope-1: Coroutine -> Count: 0
 Scope-2: Coroutine -> Count: 1
 Scope-1: Coroutine -> Count: 1
 ...
-Scope-1: Coroutine -> Count: 55
-Scope-2: Coroutine -> Count: 56
+Scope-2: Coroutine -> Count: 54
+Scope-1: Coroutine -> Count: 54
 Scope-1 cancelled
+Scope-1 isActive: false
 Scope-2 isActive: false
-Scope-2 coroutine is completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@6eb715d3
-Scope-2 is completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@6eb715d3
+Scope-1 coroutine is completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@7d21821
+Scope-2 coroutine is completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@7d21821
+Scope-1 is completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@7d21821
+Scope-2 is completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@7d21821
 ```
   
 2. 🚫 Exception:
@@ -2056,8 +2059,7 @@ Scope-2 is completed: kotlinx.coroutines.JobCancellationException: Job was cance
 suspend fun main () {
     val job = Job()
     val scope1 = CoroutineScope(job)
-    val scope2 =
-        CoroutineScope(job + CoroutineExceptionHandler { _, throwable -> println("Scope-2:- CoroutineExceptionHandler: $throwable") })
+    val scope2 = CoroutineScope(job + CoroutineExceptionHandler { _, throwable -> println("Scope-2:- CoroutineExceptionHandler: $throwable") })
 
     scope1.launch {
 
