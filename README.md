@@ -1705,7 +1705,7 @@ CoroutineScope(Job()).launch {                // Scope-A
 
 ### 🟠 Behavior Summary of Nested CoroutineScopes with individual Job
 
-1. ⚠️ Cancellation:
+### 1. 🟠 Cancellation ⚠️:
 - Each CoroutineScope(Job()) creates a separate coroutine hierarchy.
 - Cancelling one scope (e.g., Scope-A) sends a cancellation signal only to its own coroutines, not to other nested scopes like Scope-B or Scope-C.
 - Likewise, if Scope-B or Scope-C is cancelled, it does not affect Scope-A or its siblings.
@@ -1784,7 +1784,7 @@ Scope-2 coroutine is completed: kotlinx.coroutines.JobCancellationException: Job
 Scope-2 is completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@3a70f639
 ```
   
-2. 🚫 Exception:
+### 2. 🟠 Exception 🚫:
 - If an uncaught exception is thrown in one scope (e.g., Scope-B), it stays within that scope.
 - The exception does not propagate to outer scopes or sibling scopes.
 - The only way to catch it is:
@@ -1844,7 +1844,7 @@ Scope-1 coroutine is completed: null
 Scope-1 is completed: null
 ```
 
-3. ✅ Completion
+### 3. 🟠 Completion ✅:
 - Each scope manages its own lifecycle independently.
 - When Scope-A completes (normally or due to cancellation), it does not wait for Scope-B or Scope-C to complete, and vice versa.
 
@@ -1901,7 +1901,7 @@ scope2.launch { ... }
 - You are injecting the same parent job into multiple scopes. So all coroutines launched from both scopes become structured children of that single job.
 - They are logically related, even though the scopes are technically separate instances.
 
-1. ⚠️ Cancellation:
+### 1. 🟠 Cancellation ⚠️:
 - Calling job.cancel() will cancel all child coroutines launched by both scopes.
 - If a child coroutine throws a CancellationException, the parent job gets canceled (if not caught).
 - If multiple scopes share the same Job, cancelling one scope cancels all associated scopes and their coroutines.
@@ -2041,7 +2041,7 @@ Scope-1 is completed: kotlinx.coroutines.JobCancellationException: Job was cance
 Scope-2 is completed: kotlinx.coroutines.JobCancellationException: Job was cancelled; job=JobImpl{Cancelling}@7d21821
 ```
   
-2. 🚫 Exception:
+### 2. 🟠 Exception 🚫:
 - An uncaught exception in a coroutine launched from any scope sharing the same Job() will propagate upward to that shared job.
 - If the shared Job() is an ordinary Job and:
 	- A CoroutineExceptionHandler is attached to the job (either via CoroutineScope(CoroutineExceptionHandler) or launch(CoroutineExceptionHandler)),
@@ -2159,7 +2159,7 @@ Scope-1 coroutine is completed: null
 Scope-1 is completed: null
 ```
 
-3. ✅ Completion
+### 3. 🟠 Completion ✅:
 - If multiple scopes share the same Job, like scope1 and scope2, then the parent Job completes only when all child coroutines launched from all scopes are completed — either normally or via cancellation.
 - This is part of structured concurrency: the parent job won’t complete until all of its children (direct or indirect) are finished.
 - invokeOnCompletion executes after all children complete, and provides insight into how the job finished.
@@ -2177,7 +2177,7 @@ Scope-1 is completed: null
 		- A coroutine cannot set a default dispatcher; it inherits unless provided explicitly.
 	5. It forms a new coroutine hierarchy — separate from the parent — and is excluded from the parent’s cancellation, exception handling, and structured waiting.
 
-1. Cancellation:
+### 1. 🟠 Cancellation ⚠️:
 - When a coroutine is launched with its own Job(), it is not linked to the parent’s job hierarchy.
 - If the parent scope or coroutine is cancelled, the coroutine with its own job will not be cancelled — it continues to run independently.
 - Likewise, if this coroutine is cancelled, it does not affect the parent or sibling coroutines — they continue to run.
@@ -2313,7 +2313,7 @@ Task-1 is finished
 Coroutine-1 is completed: null
 ```
 
-2. Exception:
+### 2. 🟠 Exception 🚫:
 - When a coroutine has its own Job(), it must handle exceptions either:
 - Imperatively using try-catch inside the coroutine, or
 - Declaratively by adding its own CoroutineExceptionHandler in its coroutine context.
@@ -2413,7 +2413,7 @@ Coroutine-2 is completed: null
 Coroutine is completed: null
 ```
 
-3. Completion:
+### 3. 🟠 Completion ✅:
 - A coroutine with its own Job() is independent, so:
 - It completes independently, either normally or with an exception or cancellation.
 - Its completion is not awaited by the parent unless explicitly done using job.join().
