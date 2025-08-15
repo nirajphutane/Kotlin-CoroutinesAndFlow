@@ -2911,6 +2911,129 @@ CoroutineExceptionHandler: java.lang.RuntimeException
 ```
 
 ---
+
+## 🎯suspendCoroutine { continuation -> }
+
+- suspendCoroutine { continuation -> }  is part of Kotlin coroutines’ low-level API to bridge callback-based code with suspending functions.
+```
+suspend fun <T> suspendCoroutine(
+    block: (Continuation<T>) -> Unit
+): T
+```
+- suspendCoroutine is a suspending function.
+- Inside it, you’re given a Continuation<T> object (your param).
+- You use that continuation to resume or resumeWithException when your callback finishes.
+- If the parent coroutine or scope is cancelled, the suspended coroutine still waits for the callback to call resume() or resumeWithException().
+
+- When an API that doesn’t support coroutines uses a callback like:
+	
+```
+// Callback-based API
+fun fetchData(id: Int, callback: (String?, Throwable?) -> Unit) {
+    // Simulate network call
+}
+```
+
+And you want to wrap it into a suspending function so you can call it with await style.
+
+```
+suspend fun getData(id: Int): String =
+    suspendCoroutine { continuation ->
+        fetchData(id:id) { result, error ->
+            if (error != null) {
+                continuation.resumeWithException(error)
+            } else if (result != null) {
+                continuation.resume(result)
+            } else {
+                continuation.resumeWithException(IllegalStateException("No data received"))
+            }
+        }
+    }
+```
+
+Now you can call it:
+```
+val data= getData(7007) // Looks synchronous, runs asynchronously
+```
+
+- You must call resume() or resumeWithException() exactly once; otherwise:
+	- If you never call it, the coroutine will never finish (hang indefinitely).
+	- If you call it more than once, it will crash with IllegalStateException.
+   	```
+    suspend fun test(): String = suspendCoroutine { continuation ->
+       continuation.resume("Result")
+       continuation.resume("Any") // ❌ IllegalStateException
+    }
+    ```
+- This is not cancellable by default. If you want cancellation support, you use suspendCancellableCoroutine { ... }.
+- Think of it as: “Pause coroutine, wait for me to call you back, then continue.”
+
+---
+
+## 🎯 suspendCancellableCoroutine { continuation -> }
+
+- suspendCancellableCoroutine { continuation -> } is part of Kotlin coroutines’ low-level API to bridge callback-based code with suspending functions while supporting cancellation.
+
+```
+suspend fun <T> suspendCancellableCoroutine(
+    block: (CancellableContinuation<T>) -> Unit
+): T
+```
+
+- It is a suspending function.
+- Inside it, you get a CancellableContinuation<T> object (your continuation).
+- You use that continuation to resume() or resumeWithException() when your callback finishes.
+- If the parent coroutine or scope is cancelled while suspended, the continuation is notified, and an optional invokeOnCancellation { ... } block can run to clean up resources.
+
+```
+interface Callback {
+    fun onSuccess(data: String)
+    fun onError(e: Exception)
+}
+
+fun fetchData(id: Int, callback: Callback) {
+    // Simulate network call
+}
+
+suspend fun getDataCancellable(id: Int): String =
+    suspendCancellableCoroutine { continuation ->
+
+        val callback = object : Callback {
+            override fun onSuccess(data: String) {
+                continuation.resume(data)
+            }
+            override fun onError(e: Exception) {
+                continuation.resumeWithException(e)
+            }
+        }
+
+        fetchData(id, callback)
+
+        // Handle coroutine cancellation
+        continuation.invokeOnCancellation {
+            println("Coroutine cancelled! Stop fetching data for $id")
+            // Optionally cancel the network request here
+        }
+    }
+
+val data = getDataCancellable(7007) // Looks synchronous, runs asynchronously
+```
+
+- You must call resume() or resumeWithException() exactly once; otherwise:
+	- If you never call it, the coroutine will never finish (hang indefinitely).
+	- If you call it more than once, it will crash with IllegalStateException.
+	```
+	suspend fun test(): String = suspendCancellableCoroutine { continuation ->
+    	continuation.resume("Result")
+    	continuation.resume("Any") // ❌ IllegalStateException
+	}
+ 	```
+
+- Supports cancellation: use invokeOnCancellation { ... } to release resources when the coroutine or scope is cancelled.
+- Ideal for long-running or IO-bound tasks.
+- Think of it as: “Pause coroutine, wait for me to call you back, but if someone cancels me, wake me up and clean up.”
+
+---
 ---
 ● [Kotlin Coroutines and Flow for Android Development](https://www.udemy.com/course/coroutines-on-android/?couponCode=NVDINCTA35CTR)
 
