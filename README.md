@@ -2953,7 +2953,7 @@ suspend fun getData(id: Int): String =
 
 Now you can call it:
 ```
-val data= getData(7007) // Looks synchronous, runs asynchronously
+val data = getData(7007) // Looks synchronous, runs asynchronously
 ```
 
 - You must call resume() or resumeWithException() exactly once; otherwise:
